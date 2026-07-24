@@ -13,9 +13,10 @@
 
 ```bash
 npm install
-npm run icons   # 產生 PWA 圖示
 npm run dev
 ```
+
+PWA 圖示已在 `public/`。若要重新產生：`npm i -D sharp@^0.35.3 && npm run icons`。
 
 ## 建置
 

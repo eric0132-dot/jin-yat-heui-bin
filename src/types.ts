@@ -27,6 +27,10 @@ export type Festival =
 
 export type ActivityKind = 'classic' | 'niche'
 
+/** App tab: classic, niche, or combined full list */
+export type AppView = ActivityKind | 'all'
+
+
 export type { HkDistrict } from './data/districts'
 
 import type { HkDistrict } from './data/districts'

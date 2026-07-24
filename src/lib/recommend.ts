@@ -2,28 +2,33 @@ import { activities } from '../data/activities'
 import { isLocationSpecific } from '../data/districts'
 import { nicheActivities } from '../data/nicheActivities'
 import type { CalendarContext } from '../data/calendar'
-import type { Activity, ActivityKind, Filters, ScoredActivity } from '../types'
+import type { Activity, ActivityKind, AppView, Filters, ScoredActivity } from '../types'
 
 function matchesSeason(activity: Activity, season: CalendarContext['season']): boolean {
   return activity.seasons === 'all' || activity.seasons.includes(season)
 }
 
-function poolFor(kind: ActivityKind, custom: Activity[]): Activity[] {
-  const base = kind === 'niche' ? nicheActivities : activities
-  return [...base, ...custom.filter((a) => a.kind === kind)]
+function poolFor(view: AppView, custom: Activity[]): Activity[] {
+  if (view === 'all') {
+    return [...activities, ...nicheActivities, ...custom]
+  }
+  const base = view === 'niche' ? nicheActivities : activities
+  return [...base, ...custom.filter((a) => a.kind === view)]
 }
 
 export function recommend(
   filters: Filters,
   calendar: CalendarContext,
-  kind: ActivityKind = 'classic',
+  view: AppView = 'classic',
   custom: Activity[] = [],
-  limit = 16,
+  limit?: number,
 ): ScoredActivity[] {
   const scored: ScoredActivity[] = []
   const districtFilters = filters.districts
+  const effectiveLimit =
+    limit ?? (view === 'all' ? Number.POSITIVE_INFINITY : 16)
 
-  for (const activity of poolFor(kind, custom)) {
+  for (const activity of poolFor(view, custom)) {
     if (
       filters.companion !== 'any' &&
       !activity.companions.includes(filters.companion)
@@ -52,7 +57,6 @@ export function recommend(
         ? activity.districts.filter((d) => districtFilters.includes(d))
         : []
 
-    // 揀咗區先做地區分析：只留重疊區同「各區都行」
     if (districtFilters.length > 0 && specific && matchedDistricts.length === 0) {
       continue
     }
@@ -75,6 +79,10 @@ export function recommend(
     if (activity.custom) {
       score += 5
       reasons.push('自訂')
+    }
+
+    if (view === 'all') {
+      reasons.push(activity.kind === 'niche' ? '小眾' : '經典')
     }
 
     if (matchesSeason(activity, calendar.season)) {
@@ -112,7 +120,7 @@ export function recommend(
       score += 2
     }
 
-    if (kind === 'niche' && reasons.length === 0) {
+    if (activity.kind === 'niche' && view !== 'all' && reasons.length === 0) {
       reasons.push('小眾靈感')
     } else if (reasons.length === 0) {
       reasons.push('符合你嘅條件')
@@ -125,21 +133,23 @@ export function recommend(
     (a, b) =>
       b.score - a.score || a.activity.name.localeCompare(b.activity.name, 'zh-HK'),
   )
-  return scored.slice(0, limit)
+
+  if (!Number.isFinite(effectiveLimit)) return scored
+  return scored.slice(0, effectiveLimit)
 }
 
 export function pickSurprise(
   filters: Filters,
   calendar: CalendarContext,
-  kind: ActivityKind = 'classic',
+  view: AppView = 'classic',
   custom: Activity[] = [],
 ): ScoredActivity | null {
-  const list = recommend(filters, calendar, kind, custom, 24)
+  const list = recommend(filters, calendar, view, custom, 24)
   if (list.length === 0) return null
   const top = list.slice(0, Math.min(8, list.length))
   return top[Math.floor(Math.random() * top.length)] ?? null
 }
 
-export function catalogSize(kind: ActivityKind, custom: Activity[]): number {
-  return poolFor(kind, custom).length
+export function catalogSize(view: AppView, custom: Activity[]): number {
+  return poolFor(view, custom).length
 }

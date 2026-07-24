@@ -11,7 +11,7 @@ import {
   saveCustomActivities,
 } from './lib/customStore'
 import { catalogSize, pickSurprise, recommend } from './lib/recommend'
-import type { Activity, ActivityKind, Filters, ScoredActivity } from './types'
+import type { Activity, ActivityKind, AppView, Filters, ScoredActivity } from './types'
 
 const defaultFilters: Filters = {
   companion: 'any',
@@ -23,7 +23,7 @@ const defaultFilters: Filters = {
 
 export default function App() {
   const calendar = getCalendarContext()
-  const [view, setView] = useState<ActivityKind>('classic')
+  const [view, setView] = useState<AppView>('classic')
   const [filters, setFilters] = useState<Filters>(defaultFilters)
   const [selected, setSelected] = useState<ScoredActivity | null>(null)
   const [custom, setCustom] = useState<Activity[]>([])
@@ -39,6 +39,7 @@ export default function App() {
   const results = recommend(filters, calendar, view, custom)
   const showLocation = filters.districts.length > 0
   const totalCatalog = catalogSize(view, custom)
+  const formKind: ActivityKind = view === 'niche' ? 'niche' : 'classic'
 
   useEffect(() => {
     const onBeforeInstall = (e: Event) => {
@@ -77,7 +78,7 @@ export default function App() {
     document.getElementById('filters')?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const switchView = (next: ActivityKind) => {
+  const switchView = (next: AppView) => {
     setView(next)
     setSelected(null)
   }
@@ -128,6 +129,14 @@ export default function App() {
         >
           小眾活動
         </button>
+        <button
+          type="button"
+          className={`view-tab ${view === 'all' ? 'is-on' : ''}`}
+          aria-pressed={view === 'all'}
+          onClick={() => switchView('all')}
+        >
+          全部推薦
+        </button>
       </nav>
 
       <Hero calendar={calendar} view={view} onStart={scrollToFilters} />
@@ -148,7 +157,7 @@ export default function App() {
           showLocation={showLocation}
           onSelect={setSelected}
         />
-        <CustomActivityForm defaultKind={view} onAdd={handleAddCustom} />
+        <CustomActivityForm defaultKind={formKind} onAdd={handleAddCustom} />
       </main>
 
       <footer className="footer">

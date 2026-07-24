@@ -1,20 +1,24 @@
 import { motion } from 'framer-motion'
 import { BUDGET_LABEL, DURATION_LABEL, TYPE_LABEL } from '../data/labels'
-import type { ActivityKind, ScoredActivity } from '../types'
+import type { AppView, ScoredActivity } from '../types'
 
 interface Props {
   results: ScoredActivity[]
   seasonHint: string
-  view: ActivityKind
+  view: AppView
   showLocation: boolean
   onSelect: (item: ScoredActivity) => void
 }
 
-function locationTag(item: ScoredActivity, showLocation: boolean, isNiche: boolean): string | null {
+function locationTag(
+  item: ScoredActivity,
+  showLocation: boolean,
+  view: AppView,
+): string | null {
   if (!showLocation) return null
   if (item.activity.placeLabel) return item.activity.placeLabel
   if (item.activity.districts.length > 0) return item.activity.districts.join('、')
-  return isNiche ? '各區都行' : '各區'
+  return view === 'classic' ? '各區' : '各區都行'
 }
 
 export function Results({
@@ -24,18 +28,26 @@ export function Results({
   showLocation,
   onSelect,
 }: Props) {
-  const isNiche = view === 'niche'
+  const title =
+    view === 'all' ? '全部推薦' : view === 'niche' ? '小眾推薦' : '推薦活動'
+  const blurb =
+    view === 'all'
+      ? showLocation
+        ? `經典同小眾合併列出全部合條件項目。${seasonHint}`
+        : `一次睇晒所有合條件推薦（唔設上限）。${seasonHint}`
+      : showLocation
+        ? `已按選定區域分析地點（可多選）。${seasonHint}`
+        : view === 'niche'
+          ? `靈感唔綁死地點；想睇指明地區可多選 18 區。${seasonHint}`
+          : `未揀 18 區時唔顯示指明地點。${seasonHint}`
 
   return (
     <section className="panel results" id="results">
       <div className="panel-head">
-        <h2>{isNiche ? '小眾推薦' : '推薦活動'}</h2>
+        <h2>{title}</h2>
         <p>
-          {showLocation
-            ? `已按選定區域分析地點（可多選）。${seasonHint}`
-            : isNiche
-              ? `靈感唔綁死地點；想睇指明地區可多選 18 區。${seasonHint}`
-              : `未揀 18 區時唔顯示指明地點。${seasonHint}`}
+          {blurb}
+          {results.length > 0 ? ` 共 ${results.length} 項。` : ''}
         </p>
       </div>
 
@@ -44,13 +56,16 @@ export function Results({
       ) : (
         <ul className="result-list">
           {results.map((item, index) => {
-            const loc = locationTag(item, showLocation, isNiche)
+            const loc = locationTag(item, showLocation, view)
             return (
               <motion.li
                 key={item.activity.id}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(index * 0.04, 0.28), duration: 0.4 }}
+                transition={{
+                  delay: Math.min(index * 0.02, 0.35),
+                  duration: 0.35,
+                }}
               >
                 <button
                   type="button"

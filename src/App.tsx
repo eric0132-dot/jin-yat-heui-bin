@@ -12,6 +12,7 @@ const defaultFilters: Filters = {
   types: [],
   duration: 'any',
   budget: 'any',
+  district: 'any',
 }
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
   const [offline, setOffline] = useState(!navigator.onLine)
 
   const results = recommend(filters, calendar, view)
+  const showLocation = filters.district !== 'any'
 
   useEffect(() => {
     const onBeforeInstall = (e: Event) => {
@@ -117,6 +119,7 @@ export default function App() {
           results={results}
           seasonHint={calendar.hint}
           view={view}
+          showLocation={showLocation}
           onSelect={setSelected}
         />
       </main>
@@ -125,10 +128,15 @@ export default function App() {
         <p>今日去邊 · 資料內建於裝置，安裝後可離線使用</p>
         <p className="footer-note">
           共 {results.length} 個推薦 · {view === 'niche' ? '小眾靈感' : '精選資料庫'}
+          {showLocation ? ` · ${filters.district}` : ''}
         </p>
       </footer>
 
-      <DetailSheet item={selected} onClose={() => setSelected(null)} />
+      <DetailSheet
+        item={selected}
+        showLocation={showLocation}
+        onClose={() => setSelected(null)}
+      />
     </div>
   )
 }

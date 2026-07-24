@@ -257,10 +257,22 @@ p {
   margin-bottom: 0.55rem;
 }
 
+.filter-hint {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin: -0.2rem 0 0.55rem;
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
+}
+
+.chip-row-districts .chip {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.7rem;
 }
 
 .chip {

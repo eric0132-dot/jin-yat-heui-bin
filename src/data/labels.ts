@@ -1,4 +1,5 @@
-import type { ActivityType, Budget, Companion, Duration } from '../types'
+import type { ActivityType, Budget, Companion, Duration, HkDistrict } from '../types'
+import { HK_DISTRICTS } from './districts'
 
 export const COMPANION_OPTIONS: { value: Companion | 'any'; label: string }[] = [
   { value: 'any', label: '唔限' },
@@ -32,6 +33,11 @@ export const BUDGET_OPTIONS: { value: Budget | 'any'; label: string }[] = [
   { value: 'low', label: '$100 內' },
   { value: 'mid', label: '$100–400' },
   { value: 'high', label: '$400+' },
+]
+
+export const DISTRICT_OPTIONS: { value: HkDistrict | 'any'; label: string }[] = [
+  { value: 'any', label: '唔限' },
+  ...HK_DISTRICTS.map((d) => ({ value: d, label: d })),
 ]
 
 export const DURATION_LABEL: Record<Duration, string> = {

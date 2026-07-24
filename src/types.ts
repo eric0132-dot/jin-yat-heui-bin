@@ -27,6 +27,12 @@ export type Festival =
 
 export type ActivityKind = 'classic' | 'niche'
 
+export type {
+  HkDistrict,
+} from './data/districts'
+
+import type { HkDistrict } from './data/districts'
+
 export interface Activity {
   id: string
   kind: ActivityKind
@@ -36,7 +42,10 @@ export interface Activity {
   companions: Companion[]
   duration: Duration
   budget: Budget
-  districts: string[]
+  /** Empty = 各區／唔指明地點 */
+  districts: HkDistrict[]
+  /** Shown only when user picks an 18-district filter */
+  placeLabel?: string
   seasons: Season[] | 'all'
   festivals?: Festival[]
   tips?: string
@@ -48,6 +57,8 @@ export interface Filters {
   types: ActivityType[]
   duration: Duration | 'any'
   budget: Budget | 'any'
+  /** Optional 18-district filter */
+  district: HkDistrict | 'any'
 }
 
 export interface ScoredActivity {

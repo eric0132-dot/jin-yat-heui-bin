@@ -1,4 +1,5 @@
 import { activities } from '../data/activities'
+import { isLocationSpecific } from '../data/districts'
 import { nicheActivities } from '../data/nicheActivities'
 import type { CalendarContext } from '../data/calendar'
 import type { Activity, ActivityKind, Filters, ScoredActivity } from '../types'
@@ -18,6 +19,7 @@ export function recommend(
   limit = 12,
 ): ScoredActivity[] {
   const scored: ScoredActivity[] = []
+  const districtFilter = filters.district
 
   for (const activity of poolFor(kind)) {
     if (
@@ -42,8 +44,25 @@ export function recommend(
       continue
     }
 
+    const specific = isLocationSpecific(activity.districts)
+    const matchesDistrict =
+      districtFilter !== 'any' && activity.districts.includes(districtFilter)
+
+    // 揀咗 18 區先做地區分析：只留該區同「各區都行」
+    if (districtFilter !== 'any' && specific && !matchesDistrict) {
+      continue
+    }
+
     let score = 10
     const reasons: string[] = []
+
+    if (matchesDistrict) {
+      score += 16
+      reasons.push(`${districtFilter}推介`)
+    } else if (districtFilter !== 'any' && !specific) {
+      score += 3
+      reasons.push('各區都行')
+    }
 
     if (matchesSeason(activity, calendar.season)) {
       score += 8

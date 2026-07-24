@@ -1,7 +1,12 @@
 import type { Activity } from '../types'
+import { normalizeDistricts, placeLabelFrom } from './districts'
+
+type NicheSeed = Omit<Activity, 'kind' | 'districts' | 'placeLabel'> & {
+  districts: string[]
+}
 
 /** Vague, place-agnostic niche ideas — no specific venues. */
-const nicheSeed: Omit<Activity, 'kind'>[] = [
+const nicheSeed: NicheSeed[] = [
   {
     id: 'niche-supermarket',
     name: '行超市慢逛',
@@ -354,4 +359,6 @@ const nicheSeed: Omit<Activity, 'kind'>[] = [
 export const nicheActivities: Activity[] = nicheSeed.map((a) => ({
   ...a,
   kind: 'niche' as const,
+  districts: normalizeDistricts(a.districts),
+  placeLabel: placeLabelFrom(a.districts),
 }))

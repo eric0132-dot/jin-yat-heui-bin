@@ -1,6 +1,11 @@
 import type { Activity } from '../types'
+import { normalizeDistricts, placeLabelFrom } from './districts'
 
-const classicSeed: Omit<Activity, 'kind'>[] = [
+type ClassicSeed = Omit<Activity, 'kind' | 'districts' | 'placeLabel'> & {
+  districts: string[]
+}
+
+const classicSeed: ClassicSeed[] = [
   {
     id: 'harbour-walk',
     name: '維港海傍散步',
@@ -504,4 +509,6 @@ const classicSeed: Omit<Activity, 'kind'>[] = [
 export const activities: Activity[] = classicSeed.map((a) => ({
   ...a,
   kind: 'classic' as const,
+  districts: normalizeDistricts(a.districts),
+  placeLabel: placeLabelFrom(a.districts),
 }))

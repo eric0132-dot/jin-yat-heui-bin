@@ -4,10 +4,11 @@ import type { ScoredActivity } from '../types'
 
 interface Props {
   item: ScoredActivity | null
+  showLocation: boolean
   onClose: () => void
 }
 
-export function DetailSheet({ item, onClose }: Props) {
+export function DetailSheet({ item, showLocation, onClose }: Props) {
   return (
     <AnimatePresence>
       {item && (
@@ -43,14 +44,17 @@ export function DetailSheet({ item, onClose }: Props) {
                 <dt>消費</dt>
                 <dd>{BUDGET_LABEL[item.activity.budget]}</dd>
               </div>
-              <div>
-                <dt>地區</dt>
-                <dd>
-                  {item.activity.kind === 'niche'
-                    ? '各區都行'
-                    : item.activity.districts.join('、')}
-                </dd>
-              </div>
+              {showLocation && (
+                <div>
+                  <dt>地區</dt>
+                  <dd>
+                    {item.activity.placeLabel ||
+                      (item.activity.districts.length > 0
+                        ? item.activity.districts.join('、')
+                        : '各區都行')}
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt>類型</dt>
                 <dd>

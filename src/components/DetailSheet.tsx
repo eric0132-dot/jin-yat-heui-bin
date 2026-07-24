@@ -6,9 +6,15 @@ interface Props {
   item: ScoredActivity | null
   showLocation: boolean
   onClose: () => void
+  onDeleteCustom?: (id: string) => void
 }
 
-export function DetailSheet({ item, showLocation, onClose }: Props) {
+export function DetailSheet({
+  item,
+  showLocation,
+  onClose,
+  onDeleteCustom,
+}: Props) {
   return (
     <AnimatePresence>
       {item && (
@@ -67,9 +73,20 @@ export function DetailSheet({ item, showLocation, onClose }: Props) {
               <p className="sheet-tips">小貼士：{item.activity.tips}</p>
             )}
 
-            <button type="button" className="btn btn-primary sheet-close" onClick={onClose}>
-              收起
-            </button>
+            <div className="sheet-actions">
+              {item.activity.custom && onDeleteCustom && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => onDeleteCustom(item.activity.id)}
+                >
+                  刪除自訂
+                </button>
+              )}
+              <button type="button" className="btn btn-primary sheet-close" onClick={onClose}>
+                收起
+              </button>
+            </div>
           </motion.div>
         </motion.div>
       )}

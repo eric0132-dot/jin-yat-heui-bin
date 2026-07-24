@@ -8,20 +8,22 @@ function matchesSeason(activity: Activity, season: CalendarContext['season']): b
   return activity.seasons === 'all' || activity.seasons.includes(season)
 }
 
-function poolFor(kind: ActivityKind): Activity[] {
-  return kind === 'niche' ? nicheActivities : activities
+function poolFor(kind: ActivityKind, custom: Activity[]): Activity[] {
+  const base = kind === 'niche' ? nicheActivities : activities
+  return [...base, ...custom.filter((a) => a.kind === kind)]
 }
 
 export function recommend(
   filters: Filters,
   calendar: CalendarContext,
   kind: ActivityKind = 'classic',
-  limit = 12,
+  custom: Activity[] = [],
+  limit = 16,
 ): ScoredActivity[] {
   const scored: ScoredActivity[] = []
-  const districtFilter = filters.district
+  const districtFilters = filters.districts
 
-  for (const activity of poolFor(kind)) {
+  for (const activity of poolFor(kind, custom)) {
     if (
       filters.companion !== 'any' &&
       !activity.companions.includes(filters.companion)
@@ -45,23 +47,34 @@ export function recommend(
     }
 
     const specific = isLocationSpecific(activity.districts)
-    const matchesDistrict =
-      districtFilter !== 'any' && activity.districts.includes(districtFilter)
+    const matchedDistricts =
+      districtFilters.length > 0
+        ? activity.districts.filter((d) => districtFilters.includes(d))
+        : []
 
-    // 揀咗 18 區先做地區分析：只留該區同「各區都行」
-    if (districtFilter !== 'any' && specific && !matchesDistrict) {
+    // 揀咗區先做地區分析：只留重疊區同「各區都行」
+    if (districtFilters.length > 0 && specific && matchedDistricts.length === 0) {
       continue
     }
 
     let score = 10
     const reasons: string[] = []
 
-    if (matchesDistrict) {
-      score += 16
-      reasons.push(`${districtFilter}推介`)
-    } else if (districtFilter !== 'any' && !specific) {
+    if (matchedDistricts.length > 0) {
+      score += 12 + matchedDistricts.length * 4
+      reasons.push(
+        matchedDistricts.length === 1
+          ? `${matchedDistricts[0]}推介`
+          : `${matchedDistricts.length}區吻合`,
+      )
+    } else if (districtFilters.length > 0 && !specific) {
       score += 3
       reasons.push('各區都行')
+    }
+
+    if (activity.custom) {
+      score += 5
+      reasons.push('自訂')
     }
 
     if (matchesSeason(activity, calendar.season)) {
@@ -119,9 +132,14 @@ export function pickSurprise(
   filters: Filters,
   calendar: CalendarContext,
   kind: ActivityKind = 'classic',
+  custom: Activity[] = [],
 ): ScoredActivity | null {
-  const list = recommend(filters, calendar, kind, 20)
+  const list = recommend(filters, calendar, kind, custom, 24)
   if (list.length === 0) return null
   const top = list.slice(0, Math.min(8, list.length))
   return top[Math.floor(Math.random() * top.length)] ?? null
+}
+
+export function catalogSize(kind: ActivityKind, custom: Activity[]): number {
+  return poolFor(kind, custom).length
 }

@@ -27,9 +27,7 @@ export type Festival =
 
 export type ActivityKind = 'classic' | 'niche'
 
-export type {
-  HkDistrict,
-} from './data/districts'
+export type { HkDistrict } from './data/districts'
 
 import type { HkDistrict } from './data/districts'
 
@@ -44,12 +42,14 @@ export interface Activity {
   budget: Budget
   /** Empty = 各區／唔指明地點 */
   districts: HkDistrict[]
-  /** Shown only when user picks an 18-district filter */
+  /** Shown only when user picks district filter(s) */
   placeLabel?: string
   seasons: Season[] | 'all'
   festivals?: Festival[]
   tips?: string
   heatFriendly?: boolean
+  /** User-created, stored locally on device */
+  custom?: boolean
 }
 
 export interface Filters {
@@ -57,12 +57,17 @@ export interface Filters {
   types: ActivityType[]
   duration: Duration | 'any'
   budget: Budget | 'any'
-  /** Optional 18-district filter */
-  district: HkDistrict | 'any'
+  /** Multi-select 18 districts; empty = 唔限 */
+  districts: HkDistrict[]
 }
 
 export interface ScoredActivity {
   activity: Activity
   score: number
   reasons: string[]
+}
+
+export type ActivityDraft = Omit<Activity, 'id' | 'custom' | 'districts' | 'placeLabel'> & {
+  districts: HkDistrict[]
+  placeLabel?: string
 }

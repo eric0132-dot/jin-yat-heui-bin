@@ -502,6 +502,55 @@ p {
   width: 100%;
 }
 
+.sheet-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.sheet-actions .sheet-close {
+  flex: 1;
+}
+
+.custom-form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field span {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.04em;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  background: rgba(244, 251, 248, 0.95);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: 2px solid rgba(15, 107, 92, 0.35);
+  outline-offset: 1px;
+}
+
+.form-error {
+  color: var(--sunset-deep);
+  font-size: 0.9rem;
+}
+
 @keyframes drift {
   from {
     transform: translate3d(0, 0, 0) scale(1);

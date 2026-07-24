@@ -32,9 +32,9 @@ export function Results({
         <h2>{isNiche ? '小眾推薦' : '推薦活動'}</h2>
         <p>
           {showLocation
-            ? `已按選定區域分析地點。${seasonHint}`
+            ? `已按選定區域分析地點（可多選）。${seasonHint}`
             : isNiche
-              ? `靈感唔綁死地點；想睇指明地區可揀 18 區。${seasonHint}`
+              ? `靈感唔綁死地點；想睇指明地區可多選 18 區。${seasonHint}`
               : `未揀 18 區時唔顯示指明地點。${seasonHint}`}
         </p>
       </div>

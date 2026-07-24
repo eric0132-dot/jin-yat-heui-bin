@@ -5,7 +5,7 @@ import {
   DURATION_OPTIONS,
   TYPE_OPTIONS,
 } from '../data/labels'
-import type { ActivityType, Filters } from '../types'
+import type { ActivityType, Filters, HkDistrict } from '../types'
 
 interface Props {
   filters: Filters
@@ -24,12 +24,22 @@ export function FilterPanel({ filters, onChange, onSurprise }: Props) {
     })
   }
 
+  const toggleDistrict = (district: HkDistrict) => {
+    const has = filters.districts.includes(district)
+    onChange({
+      ...filters,
+      districts: has
+        ? filters.districts.filter((d) => d !== district)
+        : [...filters.districts, district],
+    })
+  }
+
   return (
     <section className="panel filters" id="filters">
       <div className="panel-head">
         <h2>你想點玩</h2>
         <p>
-          揀同行、類型、時長同消費；18 區可選，選咗先會按區推介並顯示地點。
+          揀同行、類型、時長同消費；18 區可多選，選咗先會按區推介並顯示地點。
         </p>
       </div>
 
@@ -105,17 +115,26 @@ export function FilterPanel({ filters, onChange, onSurprise }: Props) {
       </div>
 
       <div className="filter-block">
-        <h3>18 區（可選）</h3>
-        <p className="filter-hint">唔限＝唔顯示指明地點；揀區先按地區分析推薦。</p>
-        <div className="chip-row chip-row-districts" role="radiogroup" aria-label="十八區">
-          {DISTRICT_OPTIONS.map((opt) => (
+        <h3>18 區（可多選）</h3>
+        <p className="filter-hint">
+          唔選＝唔顯示指明地點；可同時揀多區做地區分析推薦。
+        </p>
+        <div className="chip-row chip-row-districts" aria-label="十八區多選">
+          <button
+            type="button"
+            className={`chip ${filters.districts.length === 0 ? 'is-on' : ''}`}
+            aria-pressed={filters.districts.length === 0}
+            onClick={() => onChange({ ...filters, districts: [] })}
+          >
+            唔限
+          </button>
+          {DISTRICT_OPTIONS.filter((o) => o.value !== 'any').map((opt) => (
             <button
               key={opt.value}
               type="button"
-              role="radio"
-              aria-checked={filters.district === opt.value}
-              className={`chip ${filters.district === opt.value ? 'is-on' : ''}`}
-              onClick={() => onChange({ ...filters, district: opt.value })}
+              aria-pressed={filters.districts.includes(opt.value as HkDistrict)}
+              className={`chip ${filters.districts.includes(opt.value as HkDistrict) ? 'is-on' : ''}`}
+              onClick={() => toggleDistrict(opt.value as HkDistrict)}
             >
               {opt.label}
             </button>
@@ -133,7 +152,7 @@ export function FilterPanel({ filters, onChange, onSurprise }: Props) {
               types: [],
               duration: 'any',
               budget: 'any',
-              district: 'any',
+              districts: [],
             })
           }
         >

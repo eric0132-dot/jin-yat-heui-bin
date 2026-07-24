@@ -1,4 +1,5 @@
 import type { Activity } from '../types'
+import { classicExtraSeed } from './activitiesExtra'
 import { normalizeDistricts, placeLabelFrom } from './districts'
 
 type ClassicSeed = Omit<Activity, 'kind' | 'districts' | 'placeLabel'> & {
@@ -506,9 +507,11 @@ const classicSeed: ClassicSeed[] = [
   },
 ]
 
-export const activities: Activity[] = classicSeed.map((a) => ({
-  ...a,
-  kind: 'classic' as const,
-  districts: normalizeDistricts(a.districts),
-  placeLabel: placeLabelFrom(a.districts),
-}))
+export const activities: Activity[] = [...classicSeed, ...classicExtraSeed].map(
+  (a) => ({
+    ...a,
+    kind: 'classic' as const,
+    districts: normalizeDistricts(a.districts),
+    placeLabel: placeLabelFrom(a.districts),
+  }),
+)

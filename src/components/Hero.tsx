@@ -6,9 +6,10 @@ interface Props {
   calendar: CalendarContext
   view: AppView
   onStart: () => void
+  onInstall?: () => void
 }
 
-export function Hero({ calendar, view, onStart }: Props) {
+export function Hero({ calendar, view, onStart, onInstall }: Props) {
   const copy =
     view === 'niche'
       ? {
@@ -52,6 +53,11 @@ export function Hero({ calendar, view, onStart }: Props) {
           <button type="button" className="btn btn-primary" onClick={onStart}>
             {copy.cta}
           </button>
+          {onInstall && (
+            <button type="button" className="btn btn-secondary" onClick={onInstall}>
+              安裝到手機
+            </button>
+          )}
         </div>
         <motion.p
           className="season-chip"

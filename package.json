@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "LAN_HTTPS=1 vite --host",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "start:lan": "npm run build && LAN_HTTPS=1 vite preview --host --port 4173",
     "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
@@ -19,6 +21,7 @@
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
     "typescript": "~6.0.2",

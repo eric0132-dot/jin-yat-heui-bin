@@ -11,7 +11,7 @@
 - 可於本機新增／刪除自訂活動（localStorage）
 - 按香港季節同常見節慶（新年、端午、中秋、聖誕、暑假等）加權推薦
 - 隨機推薦、活動詳情
-- Service Worker 快取，支援安裝同離線使用
+- **安裝掣**：Android 可一鍵安裝；iPhone 有加入主畫面步驟；安裝後可離線用
 
 ## 開發
 
@@ -22,11 +22,25 @@ npm run dev
 
 PWA 圖示已在 `public/`。若要重新產生：`npm i -D sharp@^0.35.3 && npm run icons`。
 
+## 同一 Wi‑Fi 用手機安裝（可離線）
+
+在電腦執行：
+
+```bash
+npm run start:lan
+```
+
+終端機會顯示例如 `https://192.168.x.x:4173/`。用手機連**同一個 Wi‑Fi**，以瀏覽器開啟該 HTTPS 位址（首次或需信任自簽憑證）。
+
+1. **Android Chrome**：撳頁面「安裝 PWA」，或選單 → 安裝應用程式  
+2. **iPhone Safari**：分享 → 加入主畫面  
+3. 安裝後開一次等載入完成，之後斷網都用得
+
+本機開發亦可用：`npm run dev:lan`
+
 ## 建置
 
 ```bash
 npm run build
 npm run preview
 ```
-
-建置後用支援 PWA 的瀏覽器開啟，即可「加到主畫面」。首次連線後，之後離線亦可使用。

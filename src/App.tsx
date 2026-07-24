@@ -3,6 +3,7 @@ import { CustomActivityForm } from './components/CustomActivityForm'
 import { DetailSheet } from './components/DetailSheet'
 import { FilterPanel } from './components/FilterPanel'
 import { Hero } from './components/Hero'
+import { InstallPrompt } from './components/InstallPrompt'
 import { Results } from './components/Results'
 import { getCalendarContext } from './data/calendar'
 import {
@@ -10,6 +11,7 @@ import {
   loadCustomActivities,
   saveCustomActivities,
 } from './lib/customStore'
+import { isStandaloneDisplay } from './lib/install'
 import { catalogSize, pickSurprise, recommend } from './lib/recommend'
 import type { Activity, ActivityKind, AppView, Filters, ScoredActivity } from './types'
 
@@ -27,10 +29,8 @@ export default function App() {
   const [filters, setFilters] = useState<Filters>(defaultFilters)
   const [selected, setSelected] = useState<ScoredActivity | null>(null)
   const [custom, setCustom] = useState<Activity[]>([])
-  const [installEvent, setInstallEvent] = useState<{
-    prompt: () => Promise<void>
-  } | null>(null)
   const [offline, setOffline] = useState(!navigator.onLine)
+  const [installed, setInstalled] = useState(isStandaloneDisplay)
 
   useEffect(() => {
     setCustom(loadCustomActivities())
@@ -42,27 +42,16 @@ export default function App() {
   const formKind: ActivityKind = view === 'niche' ? 'niche' : 'classic'
 
   useEffect(() => {
-    const onBeforeInstall = (e: Event) => {
-      e.preventDefault()
-      const ev = e as Event & {
-        prompt: () => Promise<void>
-        userChoice: Promise<{ outcome: string }>
-      }
-      setInstallEvent({
-        prompt: async () => {
-          await ev.prompt()
-        },
-      })
-    }
     const goOffline = () => setOffline(true)
     const goOnline = () => setOffline(false)
-    window.addEventListener('beforeinstallprompt', onBeforeInstall)
+    const onInstalled = () => setInstalled(true)
     window.addEventListener('offline', goOffline)
     window.addEventListener('online', goOnline)
+    window.addEventListener('appinstalled', onInstalled)
     return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall)
       window.removeEventListener('offline', goOffline)
       window.removeEventListener('online', goOnline)
+      window.removeEventListener('appinstalled', onInstalled)
     }
   }, [])
 
@@ -76,6 +65,10 @@ export default function App() {
 
   const scrollToFilters = () => {
     document.getElementById('filters')?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const scrollToInstall = () => {
+    document.getElementById('install')?.scrollIntoView({ behavior: 'smooth' })
   }
 
   const switchView = (next: AppView) => {
@@ -101,13 +94,14 @@ export default function App() {
     <div className="app">
       <div className="status-bar">
         {offline && <span className="status-pill">離線模式</span>}
-        {installEvent && (
+        {installed && <span className="status-pill">已安裝</span>}
+        {!installed && (
           <button
             type="button"
             className="status-pill status-action"
-            onClick={() => void installEvent.prompt()}
+            onClick={scrollToInstall}
           >
-            安裝到主畫面
+            安裝 App
           </button>
         )}
       </div>
@@ -139,9 +133,15 @@ export default function App() {
         </button>
       </nav>
 
-      <Hero calendar={calendar} view={view} onStart={scrollToFilters} />
+      <Hero
+        calendar={calendar}
+        view={view}
+        onStart={scrollToFilters}
+        onInstall={installed ? undefined : scrollToInstall}
+      />
 
       <main className="main">
+        <InstallPrompt />
         <FilterPanel
           filters={filters}
           onChange={setFilters}

@@ -1,19 +1,26 @@
 import { motion } from 'framer-motion'
 import { BUDGET_LABEL, DURATION_LABEL, TYPE_LABEL } from '../data/labels'
-import type { ScoredActivity } from '../types'
+import type { ActivityKind, ScoredActivity } from '../types'
 
 interface Props {
   results: ScoredActivity[]
   seasonHint: string
+  view: ActivityKind
   onSelect: (item: ScoredActivity) => void
 }
 
-export function Results({ results, seasonHint, onSelect }: Props) {
+export function Results({ results, seasonHint, view, onSelect }: Props) {
+  const isNiche = view === 'niche'
+
   return (
     <section className="panel results" id="results">
       <div className="panel-head">
-        <h2>推薦活動</h2>
-        <p>{seasonHint}</p>
+        <h2>{isNiche ? '小眾推薦' : '推薦活動'}</h2>
+        <p>
+          {isNiche
+            ? '以下靈感唔綁死地點，各區都行。' + (seasonHint ? ` ${seasonHint}` : '')
+            : seasonHint}
+        </p>
       </div>
 
       {results.length === 0 ? (
@@ -51,7 +58,7 @@ export function Results({ results, seasonHint, onSelect }: Props) {
                       {TYPE_LABEL[t]}
                     </span>
                   ))}
-                  <span className="tag">{item.activity.districts[0]}</span>
+                  <span className="tag">{isNiche ? '各區都行' : item.activity.districts[0]}</span>
                 </div>
               </button>
             </motion.li>

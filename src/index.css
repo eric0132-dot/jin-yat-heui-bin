@@ -75,6 +75,45 @@ p {
   pointer-events: none;
 }
 
+.view-tabs {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+}
+
+.view-tab {
+  border: none;
+  border-radius: 999px;
+  padding: 0.65rem 0.75rem;
+  background: transparent;
+  color: var(--ink-soft);
+  font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.view-tab.is-on {
+  background: var(--jade);
+  color: white;
+}
+
+.hero-niche .brand {
+  letter-spacing: 0.08em;
+}
+
+.hero-niche .hero-glow {
+  background:
+    radial-gradient(closest-side, rgba(216, 196, 160, 0.4), transparent 70%),
+    radial-gradient(closest-side, rgba(15, 107, 92, 0.28), transparent 72%);
+}
+
 .status-pill {
   pointer-events: auto;
   border: 1px solid var(--line);

@@ -5,7 +5,7 @@ import { Hero } from './components/Hero'
 import { Results } from './components/Results'
 import { getCalendarContext } from './data/calendar'
 import { pickSurprise, recommend } from './lib/recommend'
-import type { Filters, ScoredActivity } from './types'
+import type { ActivityKind, Filters, ScoredActivity } from './types'
 
 const defaultFilters: Filters = {
   companion: 'any',
@@ -16,6 +16,7 @@ const defaultFilters: Filters = {
 
 export default function App() {
   const calendar = getCalendarContext()
+  const [view, setView] = useState<ActivityKind>('classic')
   const [filters, setFilters] = useState<Filters>(defaultFilters)
   const [selected, setSelected] = useState<ScoredActivity | null>(null)
   const [installEvent, setInstallEvent] = useState<{
@@ -23,7 +24,7 @@ export default function App() {
   } | null>(null)
   const [offline, setOffline] = useState(!navigator.onLine)
 
-  const results = recommend(filters, calendar)
+  const results = recommend(filters, calendar, view)
 
   useEffect(() => {
     const onBeforeInstall = (e: Event) => {
@@ -62,6 +63,11 @@ export default function App() {
     document.getElementById('filters')?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const switchView = (next: ActivityKind) => {
+    setView(next)
+    setSelected(null)
+  }
+
   return (
     <div className="app">
       <div className="status-bar">
@@ -77,27 +83,49 @@ export default function App() {
         )}
       </div>
 
-      <Hero calendar={calendar} onStart={scrollToFilters} />
+      <nav className="view-tabs" aria-label="活動分類">
+        <button
+          type="button"
+          className={`view-tab ${view === 'classic' ? 'is-on' : ''}`}
+          aria-pressed={view === 'classic'}
+          onClick={() => switchView('classic')}
+        >
+          經典推薦
+        </button>
+        <button
+          type="button"
+          className={`view-tab ${view === 'niche' ? 'is-on' : ''}`}
+          aria-pressed={view === 'niche'}
+          onClick={() => switchView('niche')}
+        >
+          小眾活動
+        </button>
+      </nav>
+
+      <Hero calendar={calendar} view={view} onStart={scrollToFilters} />
 
       <main className="main">
         <FilterPanel
           filters={filters}
           onChange={setFilters}
           onSurprise={() => {
-            const pick = pickSurprise(filters, calendar)
+            const pick = pickSurprise(filters, calendar, view)
             if (pick) setSelected(pick)
           }}
         />
         <Results
           results={results}
           seasonHint={calendar.hint}
+          view={view}
           onSelect={setSelected}
         />
       </main>
 
       <footer className="footer">
         <p>今日去邊 · 資料內建於裝置，安裝後可離線使用</p>
-        <p className="footer-note">共 {results.length} 個推薦 · 精選資料庫驗證版</p>
+        <p className="footer-note">
+          共 {results.length} 個推薦 · {view === 'niche' ? '小眾靈感' : '精選資料庫'}
+        </p>
       </footer>
 
       <DetailSheet item={selected} onClose={() => setSelected(null)} />

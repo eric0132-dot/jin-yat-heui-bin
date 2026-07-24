@@ -45,7 +45,11 @@ export function DetailSheet({ item, onClose }: Props) {
               </div>
               <div>
                 <dt>地區</dt>
-                <dd>{item.activity.districts.join('、')}</dd>
+                <dd>
+                  {item.activity.kind === 'niche'
+                    ? '各區都行'
+                    : item.activity.districts.join('、')}
+                </dd>
               </div>
               <div>
                 <dt>類型</dt>

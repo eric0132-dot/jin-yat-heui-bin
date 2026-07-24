@@ -25,8 +25,11 @@ export type Festival =
   | 'christmas'
   | 'summerholiday'
 
+export type ActivityKind = 'classic' | 'niche'
+
 export interface Activity {
   id: string
+  kind: ActivityKind
   name: string
   description: string
   types: ActivityType[]

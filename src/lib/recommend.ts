@@ -1,19 +1,25 @@
 import { activities } from '../data/activities'
+import { nicheActivities } from '../data/nicheActivities'
 import type { CalendarContext } from '../data/calendar'
-import type { Activity, Filters, ScoredActivity } from '../types'
+import type { Activity, ActivityKind, Filters, ScoredActivity } from '../types'
 
 function matchesSeason(activity: Activity, season: CalendarContext['season']): boolean {
   return activity.seasons === 'all' || activity.seasons.includes(season)
 }
 
+function poolFor(kind: ActivityKind): Activity[] {
+  return kind === 'niche' ? nicheActivities : activities
+}
+
 export function recommend(
   filters: Filters,
   calendar: CalendarContext,
+  kind: ActivityKind = 'classic',
   limit = 12,
 ): ScoredActivity[] {
   const scored: ScoredActivity[] = []
 
-  for (const activity of activities) {
+  for (const activity of poolFor(kind)) {
     if (
       filters.companion !== 'any' &&
       !activity.companions.includes(filters.companion)
@@ -74,20 +80,28 @@ export function recommend(
       score += 2
     }
 
-    if (reasons.length === 0) reasons.push('符合你嘅條件')
+    if (kind === 'niche' && reasons.length === 0) {
+      reasons.push('小眾靈感')
+    } else if (reasons.length === 0) {
+      reasons.push('符合你嘅條件')
+    }
 
     scored.push({ activity, score, reasons })
   }
 
-  scored.sort((a, b) => b.score - a.score || a.activity.name.localeCompare(b.activity.name, 'zh-HK'))
+  scored.sort(
+    (a, b) =>
+      b.score - a.score || a.activity.name.localeCompare(b.activity.name, 'zh-HK'),
+  )
   return scored.slice(0, limit)
 }
 
 export function pickSurprise(
   filters: Filters,
   calendar: CalendarContext,
+  kind: ActivityKind = 'classic',
 ): ScoredActivity | null {
-  const list = recommend(filters, calendar, 20)
+  const list = recommend(filters, calendar, kind, 20)
   if (list.length === 0) return null
   const top = list.slice(0, Math.min(8, list.length))
   return top[Math.floor(Math.random() * top.length)] ?? null

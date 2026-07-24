@@ -1,6 +1,6 @@
 import type { Activity } from '../types'
 
-export const activities: Activity[] = [
+const classicSeed: Omit<Activity, 'kind'>[] = [
   {
     id: 'harbour-walk',
     name: '維港海傍散步',
@@ -500,3 +500,8 @@ export const activities: Activity[] = [
     festivals: ['chingming'],
   },
 ]
+
+export const activities: Activity[] = classicSeed.map((a) => ({
+  ...a,
+  kind: 'classic' as const,
+}))

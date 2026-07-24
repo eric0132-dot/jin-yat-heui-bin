@@ -130,9 +130,30 @@ export function recommend(
       }
     }
 
+    if (
+      filters.companion === 'schoolPickup' &&
+      activity.companions.includes('schoolPickup')
+    ) {
+      score += 10
+      reasons.push('放學前啱做')
+      if (activity.duration === 'short') {
+        score += 4
+      }
+    }
+
     // Prefer TKO / Hang Hau short solos when user picked 西貢區
     if (
       filters.companion === 'solo' &&
+      districtFilters.includes('西貢區') &&
+      activity.districts.includes('西貢區') &&
+      activity.duration === 'short'
+    ) {
+      score += 8
+      reasons.push('將軍澳／坑口一帶')
+    }
+
+    if (
+      filters.companion === 'schoolPickup' &&
       districtFilters.includes('西貢區') &&
       activity.districts.includes('西貢區') &&
       activity.duration === 'short'

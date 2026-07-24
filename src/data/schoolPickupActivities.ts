@@ -1,0 +1,303 @@
+/** Homemaker / parent activities while waiting for school pickup (<2h). */
+export const schoolPickupSeed: Array<{
+  id: string
+  name: string
+  description: string
+  types: Array<
+    | 'outdoor'
+    | 'indoor'
+    | 'food'
+    | 'culture'
+    | 'nature'
+    | 'shopping'
+    | 'sports'
+    | 'relax'
+  >
+  companions: Array<'solo' | 'family' | 'couple' | 'friends' | 'schoolPickup'>
+  duration: 'short' | 'halfday' | 'fullday'
+  budget: 'free' | 'low' | 'mid' | 'high'
+  districts: string[]
+  seasons: 'all' | Array<'spring' | 'summer' | 'autumn' | 'winter'>
+  festivals?: Array<
+    | 'cny'
+    | 'chingming'
+    | 'dragonboat'
+    | 'midautumn'
+    | 'halloween'
+    | 'christmas'
+    | 'summerholiday'
+  >
+  tips?: string
+  heatFriendly?: boolean
+}> = [
+  // —— 通用／各區 ——
+  {
+    id: 'pickup-grocery',
+    name: '趁放學前買餸',
+    description: '去街市或超市執今晚餸料，返到學校剛好接放學。',
+    types: ['shopping', 'food', 'outdoor'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'low',
+    districts: ['各區'],
+    seasons: 'all',
+    tips: '揀近學校嗰邊街市，唔使趕。',
+  },
+  {
+    id: 'pickup-supermarket-browse',
+    name: '超市慢逛解悶',
+    description: '冇壓力咁行超市，執日用品或者試新產品。',
+    types: ['shopping', 'indoor', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['各區'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-cafe',
+    name: 'Cafe 坐低歇腳',
+    description: '放學前一小時入 Cafe 歎杯嘢，睇電話或者發呆。',
+    types: ['food', 'indoor', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'mid',
+    districts: ['各區'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-library',
+    name: '圖書館睇書充電',
+    description: '附近圖書館坐低睇書或雜誌，安靜又近學校。',
+    types: ['indoor', 'culture', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['各區'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-park-walk',
+    name: '學校附近公園慢行',
+    description: '公園行兩圈吹風，時間到就去校門。',
+    types: ['outdoor', 'relax', 'sports'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['各區'],
+    seasons: 'all',
+  },
+  {
+    id: 'pickup-mall-short',
+    name: '商場短逛',
+    description: '近學校商場行一層，執日用品或者睇櫥窗。',
+    types: ['shopping', 'indoor', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'low',
+    districts: ['各區'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-bank-post',
+    name: '辦銀行／郵局差事',
+    description: '趁空檔搞埋轉賬、寄信或繳費，一舉兩得。',
+    types: ['indoor', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['各區'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-stretch',
+    name: '公園伸展鬆一鬆',
+    description: '喺公園做簡單伸展或步行，等放學前鬆下身心。',
+    types: ['sports', 'outdoor', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['各區'],
+    seasons: 'all',
+  },
+  {
+    id: 'pickup-tea-break',
+    name: '茶餐廳歎下午茶',
+    description: '奶茶加多士，短短休息再去接小朋友。',
+    types: ['food', 'indoor', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'low',
+    districts: ['各區'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-pharmacy-errand',
+    name: '藥房／雜貨店執貨',
+    description: '買日用品、紙巾或藥品，順路又實用。',
+    types: ['shopping', 'indoor'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'low',
+    districts: ['各區'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-window-shop',
+    name: '街舖櫥窗散步',
+    description: '沿學校附近街道行，睇舖頭唔一定要買。',
+    types: ['outdoor', 'shopping', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['各區'],
+    seasons: 'all',
+  },
+  {
+    id: 'pickup-podcast-walk',
+    name: '行路聽 Podcast',
+    description: '戴耳機喺校網附近行一圈，聽完一集剛好去接。',
+    types: ['outdoor', 'relax', 'sports'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['各區'],
+    seasons: 'all',
+  },
+
+  // —— 將軍澳／坑口 ——
+  {
+    id: 'pickup-tko-promenade',
+    name: '將軍澳海濱等放學前散步',
+    description: '海濱行半至一小時，再去附近學校接小朋友。',
+    types: ['outdoor', 'relax', 'sports'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['將軍澳'],
+    seasons: 'all',
+  },
+  {
+    id: 'pickup-hang-hau-market',
+    name: '坑口買餸再接放學',
+    description: '坑口街市或超市執餸，時間剛剛好去校門。',
+    types: ['shopping', 'food', 'outdoor'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'low',
+    districts: ['坑口'],
+    seasons: 'all',
+  },
+  {
+    id: 'pickup-tko-mall-cafe',
+    name: '將軍澳商場 Cafe 等時間',
+    description: 'PopCorn／東港城／新都城坐低，睇一睇時間再出發接放學。',
+    types: ['food', 'indoor', 'relax', 'shopping'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'mid',
+    districts: ['將軍澳', '坑口'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-tko-library',
+    name: '將軍澳圖書館等放學',
+    description: '圖書館安靜睇書，出到門口交通去各校都方便。',
+    types: ['indoor', 'culture', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['將軍澳'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-hang-hau-cafe',
+    name: '坑口 Cafe 歇腳',
+    description: '坑口一帶 Cafe 坐陣，適合接放學前放空。',
+    types: ['food', 'indoor', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'mid',
+    districts: ['坑口'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-hang-hau-village',
+    name: '坑口村短逛',
+    description: '村口行一轉、食小食，再行去附近學校。',
+    types: ['food', 'outdoor', 'culture'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'low',
+    districts: ['坑口'],
+    seasons: 'all',
+  },
+  {
+    id: 'pickup-tko-park',
+    name: '將軍澳公園慢行',
+    description: '公園散步或坐長椅，時間到再去接。',
+    types: ['outdoor', 'relax'],
+    companions: ['schoolPickup', 'solo', 'family'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['將軍澳'],
+    seasons: 'all',
+  },
+  {
+    id: 'pickup-lohas-short',
+    name: '康城短行再接放學',
+    description: '康城海傍或商場短逛，適合住附近或順路嘅家長。',
+    types: ['outdoor', 'shopping', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'low',
+    districts: ['康城', '將軍澳南'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-tko-errands',
+    name: '將軍澳商場執日用品',
+    description: '趁空檔買家庭用品，之後去接小朋友。',
+    types: ['shopping', 'indoor'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'low',
+    districts: ['將軍澳', '坑口'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+  {
+    id: 'pickup-tiu-keng-leng',
+    name: '調景嶺一帶散步等時間',
+    description: '調景嶺公園或海傍短行，再轉去將軍澳各校。',
+    types: ['outdoor', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'free',
+    districts: ['調景嶺', '將軍澳'],
+    seasons: 'all',
+  },
+  {
+    id: 'pickup-tko-dessert',
+    name: '歎完甜品去接放學',
+    description: '坑口或將軍澳甜品店坐低，甜一下再去校門。',
+    types: ['food', 'indoor', 'relax'],
+    companions: ['schoolPickup', 'solo'],
+    duration: 'short',
+    budget: 'low',
+    districts: ['坑口', '將軍澳'],
+    seasons: 'all',
+    heatFriendly: true,
+  },
+]

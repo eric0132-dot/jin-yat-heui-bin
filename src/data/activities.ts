@@ -1,6 +1,7 @@
 import type { Activity } from '../types'
 import { classicExtraSeed } from './activitiesExtra'
 import { normalizeDistricts, placeLabelFrom } from './districts'
+import { schoolPickupSeed } from './schoolPickupActivities'
 import { soloTkoSeed } from './soloTkoActivities'
 
 type ClassicSeed = Omit<Activity, 'kind' | 'districts' | 'placeLabel'> & {
@@ -512,6 +513,7 @@ export const activities: Activity[] = [
   ...classicSeed,
   ...classicExtraSeed,
   ...soloTkoSeed,
+  ...schoolPickupSeed,
 ].map((a) => ({
   ...a,
   kind: 'classic' as const,

@@ -1,4 +1,4 @@
-export type Companion = 'solo' | 'family' | 'couple' | 'friends'
+export type Companion = 'solo' | 'family' | 'couple' | 'friends' | 'schoolPickup'
 
 export type ActivityType =
   | 'outdoor'

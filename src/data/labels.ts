@@ -5,6 +5,7 @@ export const COMPANION_OPTIONS: { value: Companion | 'any'; label: string }[] = 
   { value: 'any', label: '唔限' },
   { value: 'solo', label: '單人' },
   { value: 'family', label: '家庭' },
+  { value: 'schoolPickup', label: '等小朋友放學' },
   { value: 'couple', label: '情侶' },
   { value: 'friends', label: '朋友' },
 ]

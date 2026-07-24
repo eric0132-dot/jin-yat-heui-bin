@@ -39,7 +39,7 @@ export function FilterPanel({ filters, onChange, onSurprise }: Props) {
       <div className="panel-head">
         <h2>你想點玩</h2>
         <p>
-          揀同行、類型、時長同消費；18 區可多選，選咗先會按區推介並顯示地點。
+          揀同行（包括等小朋友放學）、類型、時長同消費；18 區可多選，選咗先會按區推介並顯示地點。
         </p>
       </div>
 

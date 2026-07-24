@@ -2,7 +2,7 @@ import { activities } from '../data/activities'
 import { isLocationSpecific } from '../data/districts'
 import { nicheActivities } from '../data/nicheActivities'
 import type { CalendarContext } from '../data/calendar'
-import type { Activity, ActivityKind, AppView, Filters, ScoredActivity } from '../types'
+import type { Activity, AppView, Filters, ScoredActivity } from '../types'
 
 function matchesSeason(activity: Activity, season: CalendarContext['season']): boolean {
   return activity.seasons === 'all' || activity.seasons.includes(season)

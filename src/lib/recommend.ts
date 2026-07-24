@@ -120,6 +120,27 @@ export function recommend(
       score += 2
     }
 
+    if (filters.companion === 'solo' && activity.companions.includes('solo')) {
+      score += 5
+      if (activity.duration === 'short') {
+        score += 3
+        reasons.push('單人短途')
+      } else {
+        reasons.push('適合單人')
+      }
+    }
+
+    // Prefer TKO / Hang Hau short solos when user picked 西貢區
+    if (
+      filters.companion === 'solo' &&
+      districtFilters.includes('西貢區') &&
+      activity.districts.includes('西貢區') &&
+      activity.duration === 'short'
+    ) {
+      score += 8
+      reasons.push('將軍澳／坑口一帶')
+    }
+
     if (activity.kind === 'niche' && view !== 'all' && reasons.length === 0) {
       reasons.push('小眾靈感')
     } else if (reasons.length === 0) {

@@ -1,0 +1,2117 @@
+From c4c96efdb79bca652bf751eaab78f08ff299aa58 Mon Sep 17 00:00:00 2001
+From: Cheung Eric <eric0132@gmail.com>
+Date: Mon, 27 Jul 2026 07:36:31 +0000
+Subject: [PATCH 1/2] Add recipe section with flavor tags and 97 home-cook
+ recipes
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Introduce「今日煮咩好」with meal, cook time, ingredient, and multi-select
+主味 filters (甜、鹹、鮮、辣、酸、苦、清淡), plus detail sheets for 1–3人份 steps.
+---
+ README.md                            |    4 +-
+ src/App.tsx                          |  221 ++++--
+ src/components/CookHero.tsx          |   31 +
+ src/components/RecipeDetailSheet.tsx |   81 ++
+ src/components/RecipeFilterPanel.tsx |  145 ++++
+ src/components/RecipeResults.tsx     |   66 ++
+ src/data/recipeLabels.ts             |   93 +++
+ src/data/recipes.ts                  | 1100 ++++++++++++++++++++++++++
+ src/index.css                        |   74 ++
+ src/lib/recipeRecommend.ts           |   53 ++
+ src/types.ts                         |   52 ++
+ 11 files changed, 1858 insertions(+), 62 deletions(-)
+ create mode 100644 src/components/CookHero.tsx
+ create mode 100644 src/components/RecipeDetailSheet.tsx
+ create mode 100644 src/components/RecipeFilterPanel.tsx
+ create mode 100644 src/components/RecipeResults.tsx
+ create mode 100644 src/data/recipeLabels.ts
+ create mode 100644 src/data/recipes.ts
+ create mode 100644 src/lib/recipeRecommend.ts
+
+diff --git a/README.md b/README.md
+index f5b0d85..54b057d 100644
+--- a/README.md
++++ b/README.md
+@@ -4,7 +4,9 @@
+ 
+ ## 功能
+ 
+-- 按同行（單人／家庭／等小朋友放學／情侶／朋友）、活動類型、時長、消費篩選
++- **今日去邊**（活動）同 **今日煮咩好**（食譜）兩大功能
++- 食譜庫約 90+ 道：茶餐廳、連鎖、家常菜；1–3 人份量材料同步驟
++- 食譜篩選：早餐／午餐／晚餐／湯水、煮食時間、材料、**主味**（甜鹹鮮辣酸甜苦清淡）、來源
+ - **經典推薦**、**小眾活動**、**全部推薦**三頁切換；全部頁合併列出合條件項目（唔設上限）
+ - 可多選 **香港 18 區**篩選：選咗先按區分析推薦，並顯示指明地點
+ - 內建約 100+ 精選活動（四季／節日），可離線使用
+diff --git a/src/App.tsx b/src/App.tsx
+index 640e9d4..a5543e3 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,9 +1,13 @@
+ import { useEffect, useState } from 'react'
++import { CookHero } from './components/CookHero'
+ import { CustomActivityForm } from './components/CustomActivityForm'
+ import { DetailSheet } from './components/DetailSheet'
+ import { FilterPanel } from './components/FilterPanel'
+ import { Hero } from './components/Hero'
+ import { InstallPrompt } from './components/InstallPrompt'
++import { RecipeDetailSheet } from './components/RecipeDetailSheet'
++import { RecipeFilterPanel } from './components/RecipeFilterPanel'
++import { RecipeResults } from './components/RecipeResults'
+ import { Results } from './components/Results'
+ import { getCalendarContext } from './data/calendar'
+ import {
+@@ -12,8 +16,22 @@ import {
+   saveCustomActivities,
+ } from './lib/customStore'
+ import { isStandaloneDisplay } from './lib/install'
++import {
++  pickRandomRecipe,
++  recipeCatalogSize,
++  recommendRecipes,
++} from './lib/recipeRecommend'
+ import { catalogSize, pickSurprise, recommend } from './lib/recommend'
+-import type { Activity, ActivityKind, AppView, Filters, ScoredActivity } from './types'
++import type {
++  Activity,
++  ActivityKind,
++  AppSection,
++  AppView,
++  Filters,
++  RecipeFilters,
++  ScoredActivity,
++  ScoredRecipe,
++} from './types'
+ 
+ const defaultFilters: Filters = {
+   companion: 'any',
+@@ -23,11 +41,22 @@ const defaultFilters: Filters = {
+   districts: [],
+ }
+ 
++const defaultRecipeFilters: RecipeFilters = {
++  meal: 'any',
++  cookTime: 'any',
++  mainIngredient: 'any',
++  flavors: [],
++  source: 'any',
++}
++
+ export default function App() {
+   const calendar = getCalendarContext()
++  const [section, setSection] = useState<AppSection>('activities')
+   const [view, setView] = useState<AppView>('classic')
+   const [filters, setFilters] = useState<Filters>(defaultFilters)
++  const [recipeFilters, setRecipeFilters] = useState<RecipeFilters>(defaultRecipeFilters)
+   const [selected, setSelected] = useState<ScoredActivity | null>(null)
++  const [selectedRecipe, setSelectedRecipe] = useState<ScoredRecipe | null>(null)
+   const [custom, setCustom] = useState<Activity[]>([])
+   const [offline, setOffline] = useState(!navigator.onLine)
+   const [installed, setInstalled] = useState(isStandaloneDisplay)
+@@ -37,6 +66,7 @@ export default function App() {
+   }, [])
+ 
+   const results = recommend(filters, calendar, view, custom)
++  const recipeResults = recommendRecipes(recipeFilters)
+   const showLocation = filters.districts.length > 0
+   const totalCatalog = catalogSize(view, custom)
+   const formKind: ActivityKind = view === 'niche' ? 'niche' : 'classic'
+@@ -57,7 +87,10 @@ export default function App() {
+ 
+   useEffect(() => {
+     const onKey = (e: KeyboardEvent) => {
+-      if (e.key === 'Escape') setSelected(null)
++      if (e.key === 'Escape') {
++        setSelected(null)
++        setSelectedRecipe(null)
++      }
+     }
+     window.addEventListener('keydown', onKey)
+     return () => window.removeEventListener('keydown', onKey)
+@@ -67,10 +100,20 @@ export default function App() {
+     document.getElementById('filters')?.scrollIntoView({ behavior: 'smooth' })
+   }
+ 
++  const scrollToRecipeFilters = () => {
++    document.getElementById('recipe-filters')?.scrollIntoView({ behavior: 'smooth' })
++  }
++
+   const scrollToInstall = () => {
+     document.getElementById('install')?.scrollIntoView({ behavior: 'smooth' })
+   }
+ 
++  const switchSection = (next: AppSection) => {
++    setSection(next)
++    setSelected(null)
++    setSelectedRecipe(null)
++  }
++
+   const switchView = (next: AppView) => {
+     setView(next)
+     setSelected(null)
+@@ -80,6 +123,7 @@ export default function App() {
+     const next = [...custom, activity]
+     setCustom(next)
+     saveCustomActivities(next)
++    setSection('activities')
+     setView(activity.kind)
+   }
+ 
+@@ -106,75 +150,130 @@ export default function App() {
+         )}
+       </div>
+ 
+-      <nav className="view-tabs" aria-label="活動分類">
++      <nav className="section-tabs" aria-label="主功能">
+         <button
+           type="button"
+-          className={`view-tab ${view === 'classic' ? 'is-on' : ''}`}
+-          aria-pressed={view === 'classic'}
+-          onClick={() => switchView('classic')}
++          className={`section-tab ${section === 'activities' ? 'is-on' : ''}`}
++          aria-pressed={section === 'activities'}
++          onClick={() => switchSection('activities')}
+         >
+-          經典推薦
++          今日去邊
+         </button>
+         <button
+           type="button"
+-          className={`view-tab ${view === 'niche' ? 'is-on' : ''}`}
+-          aria-pressed={view === 'niche'}
+-          onClick={() => switchView('niche')}
++          className={`section-tab ${section === 'recipes' ? 'is-on' : ''}`}
++          aria-pressed={section === 'recipes'}
++          onClick={() => switchSection('recipes')}
+         >
+-          小眾活動
+-        </button>
+-        <button
+-          type="button"
+-          className={`view-tab ${view === 'all' ? 'is-on' : ''}`}
+-          aria-pressed={view === 'all'}
+-          onClick={() => switchView('all')}
+-        >
+-          全部推薦
++          今日煮咩好
+         </button>
+       </nav>
+ 
+-      <Hero
+-        calendar={calendar}
+-        view={view}
+-        onStart={scrollToFilters}
+-        onInstall={installed ? undefined : scrollToInstall}
+-      />
+-
+-      <main className="main">
+-        <InstallPrompt />
+-        <FilterPanel
+-          filters={filters}
+-          onChange={setFilters}
+-          onSurprise={() => {
+-            const pick = pickSurprise(filters, calendar, view, custom)
+-            if (pick) setSelected(pick)
+-          }}
+-        />
+-        <Results
+-          results={results}
+-          seasonHint={calendar.hint}
+-          view={view}
+-          showLocation={showLocation}
+-          onSelect={setSelected}
+-        />
+-        <CustomActivityForm defaultKind={formKind} onAdd={handleAddCustom} />
+-      </main>
+-
+-      <footer className="footer">
+-        <p>今日去邊 · 資料內建於裝置，安裝後可離線使用</p>
+-        <p className="footer-note">
+-          顯示 {results.length} 個推薦 · 本頁資料庫 {totalCatalog} 項
+-          {custom.length > 0 ? `（含自訂 ${custom.length}）` : ''}
+-          {showLocation ? ` · ${filters.districts.join('、')}` : ''}
+-        </p>
+-      </footer>
+-
+-      <DetailSheet
+-        item={selected}
+-        showLocation={showLocation}
+-        onClose={() => setSelected(null)}
+-        onDeleteCustom={handleDeleteCustom}
+-      />
++      {section === 'activities' ? (
++        <>
++          <nav className="view-tabs" aria-label="活動分類">
++            <button
++              type="button"
++              className={`view-tab ${view === 'classic' ? 'is-on' : ''}`}
++              aria-pressed={view === 'classic'}
++              onClick={() => switchView('classic')}
++            >
++              經典推薦
++            </button>
++            <button
++              type="button"
++              className={`view-tab ${view === 'niche' ? 'is-on' : ''}`}
++              aria-pressed={view === 'niche'}
++              onClick={() => switchView('niche')}
++            >
++              小眾活動
++            </button>
++            <button
++              type="button"
++              className={`view-tab ${view === 'all' ? 'is-on' : ''}`}
++              aria-pressed={view === 'all'}
++              onClick={() => switchView('all')}
++            >
++              全部推薦
++            </button>
++          </nav>
++
++          <Hero
++            calendar={calendar}
++            view={view}
++            onStart={scrollToFilters}
++            onInstall={installed ? undefined : scrollToInstall}
++          />
++
++          <main className="main">
++            <InstallPrompt />
++            <FilterPanel
++              filters={filters}
++              onChange={setFilters}
++              onSurprise={() => {
++                const pick = pickSurprise(filters, calendar, view, custom)
++                if (pick) setSelected(pick)
++              }}
++            />
++            <Results
++              results={results}
++              seasonHint={calendar.hint}
++              view={view}
++              showLocation={showLocation}
++              onSelect={setSelected}
++            />
++            <CustomActivityForm defaultKind={formKind} onAdd={handleAddCustom} />
++          </main>
++
++          <footer className="footer">
++            <p>今日去邊 · 資料內建於裝置，安裝後可離線使用</p>
++            <p className="footer-note">
++              顯示 {results.length} 個推薦 · 本頁資料庫 {totalCatalog} 項
++              {custom.length > 0 ? `（含自訂 ${custom.length}）` : ''}
++              {showLocation ? ` · ${filters.districts.join('、')}` : ''}
++            </p>
++          </footer>
++
++          <DetailSheet
++            item={selected}
++            showLocation={showLocation}
++            onClose={() => setSelected(null)}
++            onDeleteCustom={handleDeleteCustom}
++          />
++        </>
++      ) : (
++        <>
++          <CookHero onStart={scrollToRecipeFilters} />
++
++          <main className="main">
++            <InstallPrompt />
++            <RecipeFilterPanel
++              filters={recipeFilters}
++              onChange={setRecipeFilters}
++              onSurprise={() => {
++                const pick = pickRandomRecipe(recipeFilters)
++                if (pick) setSelectedRecipe(pick)
++              }}
++            />
++            <RecipeResults
++              results={recipeResults}
++              onSelect={setSelectedRecipe}
++            />
++          </main>
++
++          <footer className="footer">
++            <p>今日煮咩好 · 食譜內建於裝置，離線可查</p>
++            <p className="footer-note">
++              顯示 {recipeResults.length} 道 · 資料庫共 {recipeCatalogSize()} 道（1–3 人份）
++            </p>
++          </footer>
++
++          <RecipeDetailSheet
++            item={selectedRecipe}
++            onClose={() => setSelectedRecipe(null)}
++          />
++        </>
++      )}
+     </div>
+   )
+ }
+diff --git a/src/components/CookHero.tsx b/src/components/CookHero.tsx
+new file mode 100644
+index 0000000..d2ca7f1
+--- /dev/null
++++ b/src/components/CookHero.tsx
+@@ -0,0 +1,31 @@
++import { motion } from 'framer-motion'
++
++interface Props {
++  onStart: () => void
++}
++
++export function CookHero({ onStart }: Props) {
++  return (
++    <header className="hero hero-cook">
++      <div className="hero-glow" aria-hidden />
++      <div className="hero-grid" aria-hidden />
++      <motion.div
++        className="hero-inner"
++        initial={{ opacity: 0, y: 28 }}
++        animate={{ opacity: 1, y: 0 }}
++        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
++      >
++        <p className="hero-kicker">茶餐廳 · 連鎖 · 家常菜 · 可離線查</p>
++        <h1 className="brand">今日煮咩好</h1>
++        <p className="hero-lead">
++          按早餐、午餐、晚餐、湯水同煮食時間揀；每道菜有 1–3 人份量材料、步驟同主味標籤。
++        </p>
++        <div className="hero-cta">
++          <button type="button" className="btn btn-primary" onClick={onStart}>
++            開始揀食譜
++          </button>
++        </div>
++      </motion.div>
++    </header>
++  )
++}
+diff --git a/src/components/RecipeDetailSheet.tsx b/src/components/RecipeDetailSheet.tsx
+new file mode 100644
+index 0000000..90cbf61
+--- /dev/null
++++ b/src/components/RecipeDetailSheet.tsx
+@@ -0,0 +1,81 @@
++import { AnimatePresence, motion } from 'framer-motion'
++import {
++  COOK_TIME_LABEL,
++  FLAVOR_LABEL,
++  INGREDIENT_LABEL,
++  MEAL_LABEL,
++  SOURCE_LABEL,
++} from '../data/recipeLabels'
++import type { ScoredRecipe } from '../types'
++
++interface Props {
++  item: ScoredRecipe | null
++  onClose: () => void
++}
++
++export function RecipeDetailSheet({ item, onClose }: Props) {
++  return (
++    <AnimatePresence>
++      {item && (
++        <motion.div
++          className="sheet-backdrop"
++          initial={{ opacity: 0 }}
++          animate={{ opacity: 1 }}
++          exit={{ opacity: 0 }}
++          onClick={onClose}
++        >
++          <motion.div
++            className="sheet sheet-recipe"
++            role="dialog"
++            aria-modal="true"
++            aria-labelledby="recipe-sheet-title"
++            initial={{ y: '100%' }}
++            animate={{ y: 0 }}
++            exit={{ y: '100%' }}
++            transition={{ type: 'spring', stiffness: 320, damping: 34 }}
++            onClick={(e) => e.stopPropagation()}
++          >
++            <div className="sheet-handle" aria-hidden />
++            <p className="sheet-reasons">
++              {MEAL_LABEL[item.recipe.meal]} · {SOURCE_LABEL[item.recipe.source]} · 1–3 人份
++            </p>
++            <h2 id="recipe-sheet-title">{item.recipe.name}</h2>
++            <p className="sheet-desc">{item.recipe.description}</p>
++
++            <div className="result-tags sheet-flavors">
++              {item.recipe.flavors.map((f) => (
++                <span key={f} className="tag tag-flavor">
++                  {FLAVOR_LABEL[f]}
++                </span>
++              ))}
++              <span className="tag">{INGREDIENT_LABEL[item.recipe.mainIngredient]}</span>
++              <span className="tag">{COOK_TIME_LABEL[item.recipe.cookTime]}</span>
++            </div>
++
++            <h3 className="sheet-subhead">材料</h3>
++            <ul className="recipe-list">
++              {item.recipe.ingredients.map((line) => (
++                <li key={line}>{line}</li>
++              ))}
++            </ul>
++
++            <h3 className="sheet-subhead">步驟</h3>
++            <ol className="recipe-steps">
++              {item.recipe.steps.map((step) => (
++                <li key={step}>{step}</li>
++              ))}
++            </ol>
++
++            {item.recipe.tips && (
++              <p className="sheet-tips">小貼士：{item.recipe.tips}</p>
++            )}
++
++            <button type="button" className="btn btn-primary sheet-close" onClick={onClose}>
++              收起
++            </button>
++          </motion.div>
++        </motion.div>
++      )}
++    </AnimatePresence>
++  )
++}
+diff --git a/src/components/RecipeFilterPanel.tsx b/src/components/RecipeFilterPanel.tsx
+new file mode 100644
+index 0000000..4ab57f3
+--- /dev/null
++++ b/src/components/RecipeFilterPanel.tsx
+@@ -0,0 +1,145 @@
++import {
++  COOK_TIME_OPTIONS,
++  FLAVOR_OPTIONS,
++  INGREDIENT_OPTIONS,
++  MEAL_OPTIONS,
++  SOURCE_OPTIONS,
++} from '../data/recipeLabels'
++import type { FlavorTag, RecipeFilters } from '../types'
++
++interface Props {
++  filters: RecipeFilters
++  onChange: (next: RecipeFilters) => void
++  onSurprise: () => void
++}
++
++export function RecipeFilterPanel({ filters, onChange, onSurprise }: Props) {
++  const toggleFlavor = (f: FlavorTag) => {
++    const has = filters.flavors.includes(f)
++    onChange({
++      ...filters,
++      flavors: has ? filters.flavors.filter((x) => x !== f) : [...filters.flavors, f],
++    })
++  }
++
++  return (
++    <section className="panel filters" id="recipe-filters">
++      <div className="panel-head">
++        <h2>今日煮咩好</h2>
++        <p>
++          按餐別、煮食時間、材料同主味揀；材料份量預設 1–3 人，可視人數加減。
++        </p>
++      </div>
++
++      <div className="filter-block">
++        <h3>餐別</h3>
++        <div className="chip-row" role="radiogroup" aria-label="餐別">
++          {MEAL_OPTIONS.map((opt) => (
++            <button
++              key={opt.value}
++              type="button"
++              role="radio"
++              aria-checked={filters.meal === opt.value}
++              className={`chip ${filters.meal === opt.value ? 'is-on' : ''}`}
++              onClick={() => onChange({ ...filters, meal: opt.value })}
++            >
++              {opt.label}
++            </button>
++          ))}
++        </div>
++      </div>
++
++      <div className="filter-block">
++        <h3>煮食時間</h3>
++        <div className="chip-row" role="radiogroup" aria-label="煮食時間">
++          {COOK_TIME_OPTIONS.map((opt) => (
++            <button
++              key={opt.value}
++              type="button"
++              role="radio"
++              aria-checked={filters.cookTime === opt.value}
++              className={`chip ${filters.cookTime === opt.value ? 'is-on' : ''}`}
++              onClick={() => onChange({ ...filters, cookTime: opt.value })}
++            >
++              {opt.label}
++            </button>
++          ))}
++        </div>
++      </div>
++
++      <div className="filter-block">
++        <h3>主要材料</h3>
++        <div className="chip-row" role="radiogroup" aria-label="主要材料">
++          {INGREDIENT_OPTIONS.map((opt) => (
++            <button
++              key={opt.value}
++              type="button"
++              role="radio"
++              aria-checked={filters.mainIngredient === opt.value}
++              className={`chip ${filters.mainIngredient === opt.value ? 'is-on' : ''}`}
++              onClick={() => onChange({ ...filters, mainIngredient: opt.value })}
++            >
++              {opt.label}
++            </button>
++          ))}
++        </div>
++      </div>
++
++      <div className="filter-block">
++        <h3>主味（可多選）</h3>
++        <div className="chip-row" aria-label="主味">
++          {FLAVOR_OPTIONS.map((opt) => (
++            <button
++              key={opt.value}
++              type="button"
++              aria-pressed={filters.flavors.includes(opt.value)}
++              className={`chip ${filters.flavors.includes(opt.value) ? 'is-on' : ''}`}
++              onClick={() => toggleFlavor(opt.value)}
++            >
++              {opt.label}
++            </button>
++          ))}
++        </div>
++      </div>
++
++      <div className="filter-block">
++        <h3>來源</h3>
++        <div className="chip-row" role="radiogroup" aria-label="來源">
++          {SOURCE_OPTIONS.map((opt) => (
++            <button
++              key={opt.value}
++              type="button"
++              role="radio"
++              aria-checked={filters.source === opt.value}
++              className={`chip ${filters.source === opt.value ? 'is-on' : ''}`}
++              onClick={() => onChange({ ...filters, source: opt.value })}
++            >
++              {opt.label}
++            </button>
++          ))}
++        </div>
++      </div>
++
++      <div className="filter-actions">
++        <button
++          type="button"
++          className="btn btn-ghost"
++          onClick={() =>
++            onChange({
++              meal: 'any',
++              cookTime: 'any',
++              mainIngredient: 'any',
++              flavors: [],
++              source: 'any',
++            })
++          }
++        >
++          重設
++        </button>
++        <button type="button" className="btn btn-secondary" onClick={onSurprise}>
++          隨機一道
++        </button>
++      </div>
++    </section>
++  )
++}
+diff --git a/src/components/RecipeResults.tsx b/src/components/RecipeResults.tsx
+new file mode 100644
+index 0000000..b159300
+--- /dev/null
++++ b/src/components/RecipeResults.tsx
+@@ -0,0 +1,66 @@
++import { motion } from 'framer-motion'
++import {
++  COOK_TIME_LABEL,
++  FLAVOR_LABEL,
++  INGREDIENT_LABEL,
++  MEAL_LABEL,
++  SOURCE_LABEL,
++} from '../data/recipeLabels'
++import type { ScoredRecipe } from '../types'
++
++interface Props {
++  results: ScoredRecipe[]
++  onSelect: (item: ScoredRecipe) => void
++}
++
++export function RecipeResults({ results, onSelect }: Props) {
++  return (
++    <section className="panel results" id="recipe-results">
++      <div className="panel-head">
++        <h2>推薦食譜</h2>
++        <p>
++          茶餐廳、連鎖同家常菜，材料同步驟已按 1–3 人份量整理。
++          {results.length > 0 ? ` 共 ${results.length} 道。` : ''}
++        </p>
++      </div>
++
++      {results.length === 0 ? (
++        <p className="empty">暫時冇符合條件嘅食譜，試下放寬主味或餐別。</p>
++      ) : (
++        <ul className="result-list">
++          {results.map((item, index) => (
++            <motion.li
++              key={item.recipe.id}
++              initial={{ opacity: 0, y: 16 }}
++              animate={{ opacity: 1, y: 0 }}
++              transition={{ delay: Math.min(index * 0.02, 0.3), duration: 0.35 }}
++            >
++              <button
++                type="button"
++                className="result-card"
++                onClick={() => onSelect(item)}
++              >
++                <div className="result-top">
++                  <h3>{item.recipe.name}</h3>
++                  <span className="result-meta">
++                    {MEAL_LABEL[item.recipe.meal]} · {COOK_TIME_LABEL[item.recipe.cookTime]}
++                  </span>
++                </div>
++                <p className="result-desc">{item.recipe.description}</p>
++                <div className="result-tags">
++                  {item.recipe.flavors.map((f) => (
++                    <span key={f} className="tag tag-flavor">
++                      {FLAVOR_LABEL[f]}
++                    </span>
++                  ))}
++                  <span className="tag">{INGREDIENT_LABEL[item.recipe.mainIngredient]}</span>
++                  <span className="tag">{SOURCE_LABEL[item.recipe.source]}</span>
++                </div>
++              </button>
++            </motion.li>
++          ))}
++        </ul>
++      )}
++    </section>
++  )
++}
+diff --git a/src/data/recipeLabels.ts b/src/data/recipeLabels.ts
+new file mode 100644
+index 0000000..9e68f1f
+--- /dev/null
++++ b/src/data/recipeLabels.ts
+@@ -0,0 +1,93 @@
++import type {
++  CookTime,
++  FlavorTag,
++  IngredientMain,
++  MealType,
++  RecipeSource,
++} from '../types'
++
++export const MEAL_OPTIONS: { value: MealType | 'any'; label: string }[] = [
++  { value: 'any', label: '唔限' },
++  { value: 'breakfast', label: '早餐' },
++  { value: 'lunch', label: '午餐' },
++  { value: 'dinner', label: '晚餐' },
++  { value: 'soup', label: '湯水' },
++]
++
++export const COOK_TIME_OPTIONS: { value: CookTime | 'any'; label: string }[] = [
++  { value: 'any', label: '唔限' },
++  { value: 'quick15', label: '15 分鐘內' },
++  { value: 'mid30', label: '約 30 分鐘' },
++  { value: 'long60', label: '30 分鐘以上' },
++]
++
++export const INGREDIENT_OPTIONS: { value: IngredientMain | 'any'; label: string }[] = [
++  { value: 'any', label: '唔限' },
++  { value: 'chicken', label: '雞' },
++  { value: 'pork', label: '豬' },
++  { value: 'beef', label: '牛' },
++  { value: 'fish', label: '魚' },
++  { value: 'seafood', label: '海鮮' },
++  { value: 'egg', label: '蛋' },
++  { value: 'tofu', label: '豆腐' },
++  { value: 'veg', label: '蔬菜' },
++  { value: 'mixed', label: '雜錦' },
++]
++
++export const FLAVOR_OPTIONS: { value: FlavorTag; label: string }[] = [
++  { value: 'sweet', label: '甜' },
++  { value: 'salty', label: '鹹' },
++  { value: 'umami', label: '鮮' },
++  { value: 'spicy', label: '辣' },
++  { value: 'sour', label: '酸' },
++  { value: 'bitter', label: '苦' },
++  { value: 'light', label: '清淡' },
++]
++
++export const SOURCE_OPTIONS: { value: RecipeSource | 'any'; label: string }[] = [
++  { value: 'any', label: '唔限' },
++  { value: 'cha_chaan_teng', label: '茶餐廳' },
++  { value: 'chain', label: '連鎖餐廳' },
++  { value: 'home', label: '家常菜' },
++]
++
++export const MEAL_LABEL: Record<MealType, string> = {
++  breakfast: '早餐',
++  lunch: '午餐',
++  dinner: '晚餐',
++  soup: '湯水',
++}
++
++export const COOK_TIME_LABEL: Record<CookTime, string> = {
++  quick15: '約 15 分鐘內',
++  mid30: '約 30 分鐘',
++  long60: '30 分鐘以上',
++}
++
++export const INGREDIENT_LABEL: Record<IngredientMain, string> = {
++  chicken: '雞',
++  pork: '豬',
++  beef: '牛',
++  fish: '魚',
++  seafood: '海鮮',
++  egg: '蛋',
++  tofu: '豆腐',
++  veg: '蔬菜',
++  mixed: '雜錦',
++}
++
++export const FLAVOR_LABEL: Record<FlavorTag, string> = {
++  sweet: '甜',
++  salty: '鹹',
++  umami: '鮮',
++  spicy: '辣',
++  sour: '酸',
++  bitter: '苦',
++  light: '清淡',
++}
++
++export const SOURCE_LABEL: Record<RecipeSource, string> = {
++  chain: '連鎖餐廳',
++  cha_chaan_teng: '茶餐廳',
++  home: '家常菜',
++}
+diff --git a/src/data/recipes.ts b/src/data/recipes.ts
+new file mode 100644
+index 0000000..9e8c399
+--- /dev/null
++++ b/src/data/recipes.ts
+@@ -0,0 +1,1100 @@
++import type { Recipe } from '../types'
++
++type Seed = Omit<Recipe, 'id'> & { id?: string }
++
++function r(seed: Seed): Recipe {
++  return { ...seed, id: seed.id ?? seed.name.replace(/\s/g, '-') }
++}
++
++/** Compact recipe catalog — ingredients are 1–3 人份量 */
++export const recipeSeeds: Recipe[] = [
++  // —— 早餐 · 茶餐廳 ——
++  r({
++    name: '菠蘿油',
++    description: '茶餐廳經典，外脆內軟配冰凍牛油。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'mixed',
++    flavors: ['sweet', 'salty'],
++    ingredients: ['菠蘿包 2–3 個', '冰凍牛油 30–50g', '砂糖少許（可選）'],
++    steps: ['菠蘿包橫切，唔切到底', '放入冰凍牛油', '趁包熱食，牛油半溶最正'],
++  }),
++  r({
++    name: '火腿通粉',
++    description: '港式早餐湯通，快手可暖胃。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami', 'light'],
++    ingredients: ['通粉 150–250g', '火腿片 4–6 片', '雞湯或清湯 600ml', '蔥花、胡椒粉'],
++    steps: ['通粉汆熟瀝乾', '滾湯下火腿', '通粉入碗，淋湯撒蔥'],
++  }),
++  r({
++    name: '肉絲公仔麵',
++    description: '茶記常見，肉絲嫩滑配即食麵。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami'],
++    ingredients: ['即食麵 2–3 個', '豬肉絲 150g', '生菜少許', '生抽、蠔油、生粉、油'],
++    steps: ['肉絲用調味醃 10 分鐘', '即食麵煮熟', '快炒肉絲，加少許水調味，淋在麵上'],
++  }),
++  r({
++    name: '沙嗲牛肉通粉',
++    description: '沙嗲香濃，早餐飽肚之選。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'mid30',
++    mainIngredient: 'beef',
++    flavors: ['salty', 'umami', 'spicy'],
++    ingredients: ['通粉 200g', '牛肉 150g', '沙嗲醬 2 湯匙', '花生醬 1 湯匙', '椰漿少許'],
++    steps: ['牛肉切片醃好', '沙嗲醬加花生醬同椰漿調成醬', '通粉煮熟，牛肉快炒淋醬'],
++  }),
++  r({
++    name: '腸粉（煎香）',
++    description: '外購腸粉回家煎香，配豉油。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'mixed',
++    flavors: ['salty', 'umami', 'light'],
++    ingredients: ['腸粉 300–400g', '豉油、麻油', '白芝麻（可選）'],
++    steps: ['平底鑊少油，腸粉煎至兩面微焦', '切件上碟', '淋豉油同麻油'],
++  }),
++  r({
++    name: '西多士',
++    description: '港式法式吐司，花生醬夾心炸香。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'egg',
++    flavors: ['sweet', 'salty'],
++    ingredients: ['方包 4–6 片', '花生醬', '雞蛋 2 隻', '牛油、煉奶'],
++    steps: ['面包夾花生醬', '蛋汁裹勻', '牛油煎至金黃', '切角淋煉奶'],
++  }),
++  r({
++    name: '粟米肉粒通粉',
++    description: '茶記湯通，粟米清甜。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['sweet', 'umami', 'light'],
++    ingredients: ['通粉 200g', '粟米粒 半罐', '豬肉粒 120g', '清湯 600ml'],
++    steps: ['肉粒醃好快炒', '滾湯加粟米', '通粉入碗加肉粒'],
++  }),
++  r({
++    name: '及第粥',
++    description: '豬雜粥，傳統港式早餐。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'long60',
++    mainIngredient: 'pork',
++    flavors: ['umami', 'salty', 'light'],
++    ingredients: ['白米 1 杯', '豬潤、豬肚、瘦肉各少許', '薑片、蔥', '鹽、胡椒粉'],
++    steps: ['米加水煲成綿粥', '豬雜汆水', '粥滾後下豬雜煮熟', '調味撒蔥'],
++    tips: '可買即食粥底縮短時間。',
++  }),
++  r({
++    name: '魚片粥',
++    description: '鮮魚片生滾粥，清淡暖胃。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'mid30',
++    mainIngredient: 'fish',
++    flavors: ['umami', 'light'],
++    ingredients: ['白米粥底 1 鍋', '鮮魚片 200g', '薑絲、蔥', '鹽、油'],
++    steps: ['粥底滾起', '下魚片輕攪', '關火燜 2 分鐘', '調味'],
++  }),
++  r({
++    name: '火腿煎蛋多士',
++    description: '經典港式早餐組合。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'egg',
++    flavors: ['salty', 'umami'],
++    ingredients: ['多士 3–4 片', '火腿 4 片', '雞蛋 2–3 隻', '牛油'],
++    steps: ['煎香火腿同蛋', '多士烘脆', '組合上碟'],
++  }),
++
++  // —— 早餐 · 家常 ——
++  r({
++    name: '蒸水蛋',
++    description: '滑嫩蒸蛋，配白粥或多士。',
++    source: 'home',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'egg',
++    flavors: ['umami', 'light'],
++    ingredients: ['雞蛋 3 隻', '溫水 1.5 倍', '鹽少許', '生抽、麻油'],
++    steps: ['蛋加水打勻過篩', '大火蒸 8–10 分鐘', '淋生抽麻油'],
++  }),
++  r({
++    name: '燕麦香蕉碗',
++    description: '快手健康早餐。',
++    source: 'home',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'mixed',
++    flavors: ['sweet', 'light'],
++    ingredients: ['即食燕麥 80g', '牛奶或豆漿 250ml', '香蕉 1–2 條', '蜜糖少許'],
++    steps: ['燕麥加奶微波或煮軟', '切香蕉拌入', '可加堅果'],
++  }),
++  r({
++    name: '番茄蛋湯通粉',
++    description: '家常早餐湯粉，酸鮮開胃。',
++    source: 'home',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'egg',
++    flavors: ['sour', 'umami', 'light'],
++    ingredients: ['通粉 200g', '番茄 2 個', '雞蛋 2 隻', '鹽、糖少許'],
++    steps: ['番茄炒出汁加水滾', '下通粉', '淋蛋花調味'],
++  }),
++  r({
++    name: '菜肉包（蒸）',
++    description: '買現成包子蒸熱，配豆漿。',
++    source: 'chain',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['umami', 'salty'],
++    ingredients: ['菜肉包 4–6 個', '豆漿 2–3 杯（可選）'],
++    steps: ['包子蒸 8–10 分鐘', '配豆漯即食'],
++  }),
++  r({
++    name: '腸粉配豉油',
++    description: '外賣腸粉加蔥油豉油。',
++    source: 'chain',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'mixed',
++    flavors: ['salty', 'umami'],
++    ingredients: ['豬腸粉/牛肉腸粉 400g', '豉油、蔥油'],
++    steps: ['腸粉蒸熱', '淋豉油蔥油'],
++  }),
++
++  // —— 午餐 · 茶餐廳／連鎖 ——
++  r({
++    name: '咖喱牛腩飯',
++    description: '連鎖茶記人氣碟飯。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'long60',
++    mainIngredient: 'beef',
++    flavors: ['spicy', 'umami', 'salty'],
++    ingredients: ['牛腩 400g', '咖喱醬 3 湯匙', '椰漿 100ml', '薯仔 2 個', '白飯 2–3 碗'],
++    steps: ['牛腩汆水', '爆香咖喱醬加牛腩薯仔燜 1 小時', '加椰漿調味', '淋飯'],
++    tips: '可用壓力鍋縮短時間。',
++  }),
++  r({
++    name: '燒味雙拼飯',
++    description: '外賣燒味配白飯，午餐經典。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami'],
++    ingredients: ['叉燒/燒肉/油雞 各 150g', '白飯 2–3 碗', '燒味汁'],
++    steps: ['燒味切片', '飯盛碟淋汁'],
++  }),
++  r({
++    name: '乾炒牛河',
++    description: '茶記鑊氣之選。',
++    source: 'cha_chaan_teng',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'beef',
++    flavors: ['salty', 'umami'],
++    ingredients: ['河粉 400g', '牛肉 150g', '芽菜、蔥', '生抽、老抽、糖'],
++    steps: ['牛肉醃好', '河粉過油', '大火快炒牛肉河粉芽菜'],
++  }),
++  r({
++    name: '星洲炒米',
++    description: '咖喱香料炒米粉。',
++    source: 'cha_chaan_teng',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'mixed',
++    flavors: ['spicy', 'umami', 'salty'],
++    ingredients: ['米粉 300g', '叉燒/蝦仁 各 80g', '咖喱粉、蝦醬', '蛋 2 隻', '洋蔥絲'],
++    steps: ['米粉泡軟', '炒蛋同配料', '下米粉同咖喱調味快炒'],
++  }),
++  r({
++    name: '焗豬扒飯',
++    description: '茶餐廳西式碟飯。',
++    source: 'cha_chaan_teng',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami', 'sweet'],
++    ingredients: ['豬扒 2 塊', '白飯 2 碗', '番茄醬 3 湯匙', '芝士片 2 片'],
++    steps: ['豬扒煎熟', '飯鋪底放豬扒同醬', '加芝士焗至金黃'],
++  }),
++  r({
++    name: '瑞士雞翼飯',
++    description: '甜鹹雞翼配飯。',
++    source: 'cha_chaan_teng',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'chicken',
++    flavors: ['sweet', 'salty', 'umami'],
++    ingredients: ['雞翼 8–10 隻', '生抽、冰糖、八角', '白飯 2–3 碗'],
++    steps: ['雞翼煎香', '加調味燜 20 分鐘', '收汁淋飯'],
++  }),
++  r({
++    name: '黑椒牛柳飯',
++    description: '連鎖餐廳常見碟飯。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'beef',
++    flavors: ['spicy', 'umami', 'salty'],
++    ingredients: ['牛柳 200g', '黑椒汁', '洋蔥、青椒', '白飯 2–3 碗'],
++    steps: ['牛柳快炒', '加黑椒汁同蔬菜', '淋飯'],
++  }),
++  r({
++    name: '肉餅飯',
++    description: '港式蒸肉餅配白飯。',
++    source: 'home',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'pork',
++    flavors: ['umami', 'salty'],
++    ingredients: ['免治豬肉 250g', '鹹蛋 1 隻（可選）', '生抽、糖、生粉', '白飯 2–3 碗'],
++    steps: ['肉餅調味撲平', '蒸 15 分鐘', '配飯'],
++  }),
++  r({
++    name: '揚州炒飯',
++    description: '蝦仁叉燒蛋炒飯。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'mixed',
++    flavors: ['umami', 'salty'],
++    ingredients: ['冷飯 3 碗', '蝦仁 80g', '叉燒粒 80g', '蛋 2 隻', '青豆'],
++    steps: ['炒蛋碎', '炒蝦仁叉燒', '下飯快炒調味'],
++  }),
++  r({
++    name: '福建炒飯',
++    description: '蝦醬風味炒飯。',
++    source: 'cha_chaan_teng',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'seafood',
++    flavors: ['salty', 'umami', 'spicy'],
++    ingredients: ['冷飯 3 碗', '蝦醬 1 湯匙', '魷魚/蝦仁', '蛋、蔥'],
++    steps: ['爆香蝦醬', '炒海鮮同飯', '加蛋蔥'],
++  }),
++  r({
++    name: '番茄蛋飯',
++    description: '家常碟飯，酸甜開胃。',
++    source: 'home',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'egg',
++    flavors: ['sour', 'sweet', 'umami'],
++    ingredients: ['番茄 3 個', '雞蛋 3 隻', '白飯 2–3 碗', '糖、鹽'],
++    steps: ['炒番茄出汁', '炒蛋', '混合淋飯'],
++  }),
++  r({
++    name: '北菇滑雞飯',
++    description: '蒸雞飯，清淡鮮甜。',
++    source: 'home',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'chicken',
++    flavors: ['umami', 'light'],
++    ingredients: ['雞脾肉 300g', '冬菇 6 朵', '生粉、生抽', '白飯 2–3 碗'],
++    steps: ['雞菇醃味', '蒸 20 分鐘', '淋飯'],
++  }),
++  r({
++    name: '魚香茄子飯',
++    description: '下飯家常菜。',
++    source: 'home',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'veg',
++    flavors: ['spicy', 'sour', 'sweet', 'salty'],
++    ingredients: ['茄子 2 條', '免治豬肉 100g', '蒜蓉、豆瓣醬', '白飯 2–3 碗'],
++    steps: ['茄子炸或煎軟', '炒肉醬', '茄子回鍋炒勻'],
++  }),
++  r({
++    name: '麻婆豆腐飯',
++    description: '川菜風味配飯。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'tofu',
++    flavors: ['spicy', 'salty', 'umami'],
++    ingredients: ['豆腐 2 盒', '免治豬肉 100g', '花椒、豆瓣醬', '白飯 2–3 碗'],
++    steps: ['炒肉碎加醬', '下豆腐輕煮', '撒花椒'],
++  }),
++  r({
++    name: '乾燒伊麵',
++    description: '茶記常見麵食。',
++    source: 'cha_chaan_teng',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'mixed',
++    flavors: ['umami', 'salty'],
++    ingredients: ['伊麵 3 個', '冬菇、蝦仁、肉絲', '上湯、蠔油'],
++    steps: ['伊麵煎至金黃', '配料炒好加湯', '麵回鍋收汁'],
++  }),
++  r({
++    name: '雞扒飯',
++    description: '連鎖快餐經典。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'chicken',
++    flavors: ['salty', 'umami'],
++    ingredients: ['雞扒 2 塊', '白飯 2–3 碗', '黑椒或蘑菇汁'],
++    steps: ['雞扒煎熟', '做汁淋飯'],
++  }),
++  r({
++    name: '蝦仁炒蛋飯',
++    description: '簡單家常午餐。',
++    source: 'home',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'seafood',
++    flavors: ['umami', 'light'],
++    ingredients: ['蝦仁 150g', '雞蛋 3 隻', '白飯 2–3 碗'],
++    steps: ['炒蝦', '炒蛋', '拌飯或分開配飯'],
++  }),
++  r({
++    name: '鹹蛋蒸肉餅',
++    description: '老火蒸餅，鹹香下飯。',
++    source: 'home',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami'],
++    ingredients: ['免治豬肉 250g', '鹹蛋黃 1–2 隻', '生抽、油'],
++    steps: ['肉餅調味放鹹蛋', '蒸 15–18 分鐘'],
++  }),
++  r({
++    name: '梅菜扣肉飯',
++    description: '傳統鹹香，需時但好味。',
++    source: 'home',
++    meal: 'lunch',
++    cookTime: 'long60',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami'],
++    ingredients: ['五花肉 400g', '梅菜 80g', '糖、生抽', '白飯 2–3 碗'],
++    steps: ['五花肉炸皮', '梅菜鋪底蒸 45 分鐘', '切片淋飯'],
++    tips: '可用預製梅菜扣肉縮短步驟。',
++  }),
++  r({
++    name: '冬菇蒸雞飯',
++    description: '一碟過蒸飯。',
++    source: 'home',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'chicken',
++    flavors: ['umami', 'light'],
++    ingredients: ['雞件 350g', '冬菇 6 朵', '白米 2 杯', '生抽、油'],
++    steps: ['米加水蒸飯', '雞菇鋪面同蒸', '調味'],
++  }),
++  r({
++    name: '咕嚕肉',
++    description: '連鎖中菜館人氣。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'pork',
++    flavors: ['sweet', 'sour'],
++    ingredients: ['豬肉 300g', '菠蘿、青椒', '茄汁、醋、糖'],
++    steps: ['肉炸脆', '炒茄汁', '肉回鍋裹醬'],
++  }),
++  r({
++    name: '宮保雞丁飯',
++    description: '花生辣香下飯。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'chicken',
++    flavors: ['spicy', 'sweet', 'salty'],
++    ingredients: ['雞丁 250g', '花生、乾辣椒', '生抽、醋、糖', '白飯 2–3 碗'],
++    steps: ['雞丁醃好快炒', '加調味同花生'],
++  }),
++
++  // —— 晚餐 · 家常 ——
++  r({
++    name: '清蒸鱸魚',
++    description: '粵式家常蒸魚。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'mid30',
++    mainIngredient: 'fish',
++    flavors: ['umami', 'light'],
++    ingredients: ['鱸魚 1 條（約 500g）', '薑蔥', '蒸魚豉油、油'],
++    steps: ['魚洗淨劃刀', '蒸 8–10 分鐘', '淋熱油同豉油'],
++  }),
++  r({
++    name: '豉油雞',
++    description: '簡易版豉油雞脾。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'mid30',
++    mainIngredient: 'chicken',
++    flavors: ['salty', 'umami'],
++    ingredients: ['雞脾 3–4 隻', '生抽、冰糖、八角', '薑片'],
++    steps: ['雞汆水', '滷汁燜 25 分鐘', '浸至入味'],
++  }),
++  r({
++    name: '白切雞',
++    description: '皮爽肉嫩，配薑葱蘸料。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'mid30',
++    mainIngredient: 'chicken',
++    flavors: ['umami', 'light'],
++    ingredients: ['三黃雞 1 隻（細）', '薑葱', '鹽、油'],
++    steps: ['雞浸熟', '冰水過冷', '斬件配薑葱油'],
++  }),
++  r({
++    name: '番茄炒蛋',
++    description: '最家常下飯菜。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'egg',
++    flavors: ['sour', 'sweet', 'umami'],
++    ingredients: ['番茄 3 個', '雞蛋 4 隻', '糖、鹽'],
++    steps: ['炒蛋起', '炒番茄', '蛋回鍋炒勻'],
++  }),
++  r({
++    name: '蒜蓉炒菜心',
++    description: '簡單青菜。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'veg',
++    flavors: ['light', 'umami'],
++    ingredients: ['菜心 400g', '蒜蓉 3 瓣', '鹽、油'],
++    steps: ['蒜蓉爆香', '下菜心快炒', '調味'],
++  }),
++  r({
++    name: '薑葱焗魚',
++    description: '港式家常魚。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'mid30',
++    mainIngredient: 'fish',
++    flavors: ['umami', 'salty'],
++    ingredients: ['魚 1 條', '薑葱大量', '生抽、蠔油'],
++    steps: ['魚煎香', '鋪薑葱', '焗或燜 8 分鐘'],
++  }),
++  r({
++    name: '蘿蔔牛腩煲',
++    description: '秋冬暖身煲。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'long60',
++    mainIngredient: 'beef',
++    flavors: ['umami', 'salty'],
++    ingredients: ['牛腩 500g', '白蘿蔔 1 條', '八角、桂皮', '柱侯醬'],
++    steps: ['牛腩燜軟', '加蘿蔔再燜', '調味'],
++  }),
++  r({
++    name: '枝竹羊肉煲',
++    description: '傳統冬季煲。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'long60',
++    mainIngredient: 'mixed',
++    flavors: ['umami', 'salty'],
++    ingredients: ['羊肉 400g', '枝竹、南腐', '當歸、薑片'],
++    steps: ['羊肉汆水', '煲 1 小時', '加枝竹南腐'],
++  }),
++  r({
++    name: '青椒炒肉絲',
++    description: '快手小炒。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami', 'spicy'],
++    ingredients: ['豬肉絲 200g', '青椒 2 個', '生抽、生粉'],
++    steps: ['肉絲醃好', '快炒青椒肉絲'],
++  }),
++  r({
++    name: '蝦仁炒西蘭花',
++    description: '清淡營養。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'seafood',
++    flavors: ['umami', 'light'],
++    ingredients: ['蝦仁 150g', '西蘭花 1 個', '蒜蓉'],
++    steps: ['西蘭花汆水', '炒蝦', '合炒調味'],
++  }),
++  r({
++    name: '客家小炒肉',
++    description: '豆干豬肉芹菜。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami', 'spicy'],
++    ingredients: ['豬肉 200g', '豆干、芹菜', '豆豉、辣椒'],
++    steps: ['各料切好', '大火快炒'],
++  }),
++  r({
++    name: '上湯娃娃菜',
++    description: '清淡湯菜。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'veg',
++    flavors: ['umami', 'light'],
++    ingredients: ['娃娃菜 2 棵', '皮蛋、火腿', '上湯或雞湯'],
++    steps: ['滾湯', '下菜煮軟'],
++  }),
++  r({
++    name: '煎焗三寶',
++    description: '茄子青椒釀肉。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'mid30',
++    mainIngredient: 'mixed',
++    flavors: ['salty', 'umami'],
++    ingredients: ['茄子、青椒、豆腐', '免治豬肉 200g', '豉汁'],
++    steps: ['釀入肉餡', '煎香', '加豉汁燜'],
++  }),
++  r({
++    name: '鹽焗雞',
++    description: '電飯煲版鹽焗雞。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'mid30',
++    mainIngredient: 'chicken',
++    flavors: ['salty', 'umami'],
++    ingredients: ['整雞 1 隻（細）', '鹽焗粉 1 包', '薑片'],
++    steps: ['雞抹粉醃', '電飯煲焗 25 分鐘'],
++  }),
++  r({
++    name: '蒜蓉粉絲蒸扇貝',
++    description: '宴客級海鮮。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'mid30',
++    mainIngredient: 'seafood',
++    flavors: ['umami', 'light'],
++    ingredients: ['扇貝 6–8 隻', '粉絲 1 束', '蒜蓉、豉油'],
++    steps: ['粉絲鋪底', '放扇貝蒜蓉', '蒸 6 分鐘'],
++  }),
++  r({
++    name: '紅燒豆腐',
++    description: '下飯素菜。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'tofu',
++    flavors: ['salty', 'umami'],
++    ingredients: ['豆腐 2 盒', '生抽、糖', '蔥'],
++    steps: ['豆腐煎香', '加調味燜入味'],
++  }),
++  r({
++    name: '苦瓜炒蛋',
++    description: '夏季清爽。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'egg',
++    flavors: ['bitter', 'light'],
++    ingredients: ['苦瓜 1 條', '雞蛋 3 隻', '鹽'],
++    steps: ['苦瓜汆水', '炒蛋', '合炒'],
++  }),
++  r({
++    name: '可樂雞翼',
++    description: '小朋友至愛。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'mid30',
++    mainIngredient: 'chicken',
++    flavors: ['sweet', 'salty'],
++    ingredients: ['雞翼 10 隻', '可樂 1 罐', '生抽、薑'],
++    steps: ['雞翼煎香', '加可樂燜', '收汁'],
++  }),
++  r({
++    name: '蠔油菜心',
++    description: '茶樓家常菜。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'veg',
++    flavors: ['umami', 'light'],
++    ingredients: ['菜心 400g', '蠔油、蒜蓉'],
++    steps: ['菜心汆熟', '淋蠔油熱油'],
++  }),
++
++  // —— 晚餐 · 連鎖風味 ——
++  r({
++    name: '韓式泡菜炒飯',
++    description: '連鎖韓食店風味。',
++    source: 'chain',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'mixed',
++    flavors: ['spicy', 'sour', 'umami'],
++    ingredients: ['冷飯 3 碗', '泡菜 100g', '蛋 1 隻', '午餐肉（可選）'],
++    steps: ['炒泡菜', '下飯同蛋炒勻'],
++  }),
++  r({
++    name: '日式咖喱豬排飯',
++    description: '連鎖咖喱店風味。',
++    source: 'chain',
++    meal: 'dinner',
++    cookTime: 'mid30',
++    mainIngredient: 'pork',
++    flavors: ['umami', 'sweet', 'spicy'],
++    ingredients: ['豬扒 2 塊', '咖喱塊 半盒', '洋蔥、薯仔', '白飯'],
++    steps: ['豬扒炸熟', '煮咖喱', '淋飯'],
++  }),
++  r({
++    name: '越式河粉（家庭版）',
++    description: '清湯牛肉河粉。',
++    source: 'chain',
++    meal: 'dinner',
++    cookTime: 'long60',
++    mainIngredient: 'beef',
++    flavors: ['umami', 'light'],
++    ingredients: ['河粉 400g', '牛肉片 200g', '牛骨湯 1L', '香草、lime'],
++    steps: ['湯滾燙生牛肉', '河粉汆熟', '淋湯'],
++    tips: '可用濃湯寶縮短熬湯。',
++  }),
++
++  // —— 湯水 ——
++  r({
++    name: '青紅蘿蔔煲豬腱',
++    description: '清潤老火湯。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'pork',
++    flavors: ['sweet', 'light', 'umami'],
++    ingredients: ['青蘿蔔 1 條', '紅蘿蔔 1 條', '豬腱 400g', '蜜棗 2 粒', '陳皮少許'],
++    steps: ['材料汆水', '煲 2 小時', '調味'],
++    tips: '2–3 人飲 4–6 碗。',
++  }),
++  r({
++    name: '花生雞腳湯',
++    description: '膠質豐富，女士最愛。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'chicken',
++    flavors: ['umami', 'sweet'],
++    ingredients: ['雞腳 400g', '花生 150g', '紅棗 5 粒', '薑片'],
++    steps: ['雞腳汆水', '所有材料煲 2 小時'],
++  }),
++  r({
++    name: '冬瓜薏米湯',
++    description: '祛濕消暑。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'pork',
++    flavors: ['light', 'umami'],
++    ingredients: ['冬瓜 500g', '薏米 80g', '瘦肉 200g', '陳皮'],
++    steps: ['薏米浸', '煲 1.5 小時', '下冬瓜再煲 30 分鐘'],
++  }),
++  r({
++    name: '竹蔗茅根湯',
++    description: '清熱下火，四季皆宜。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'mixed',
++    flavors: ['sweet', 'light'],
++    ingredients: ['竹蔗 2 節', '茅根 1 束', '胡蘿蔔 1 條', '马蹄 6 個'],
++    steps: ['材料洗淨', '煲 1.5 小時'],
++  }),
++  r({
++    name: '南北杏雪梨湯',
++    description: '潤肺止咳。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'mixed',
++    flavors: ['sweet', 'light'],
++    ingredients: ['雪梨 2 個', '南北杏 40g', '瘦肉 200g', '無花果 3 粒'],
++    steps: ['材料汆水', '煲 1.5 小時'],
++  }),
++  r({
++    name: '淮山杞子雞湯',
++    description: '補氣養生。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'chicken',
++    flavors: ['umami', 'light', 'sweet'],
++    ingredients: ['雞 半隻', '淮山 200g', '杞子 20g', '紅棗 5 粒'],
++    steps: ['雞汆水', '煲 1.5 小時'],
++  }),
++  r({
++    name: '蓮藕排骨湯',
++    description: '粉藕煲湯香甜。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'pork',
++    flavors: ['sweet', 'umami'],
++    ingredients: ['蓮藕 500g', '排骨 350g', '花生 80g', '薑'],
++    steps: ['排骨汆水', '煲 2 小時'],
++  }),
++  r({
++    name: '粉葛赤小豆湯',
++    description: '祛濕經典。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'mixed',
++    flavors: ['light', 'sweet'],
++    ingredients: ['粉葛 500g', '赤小豆 80g', '瘦肉 200g', '陳皮'],
++    steps: ['豆浸', '煲 2 小時'],
++  }),
++  r({
++    name: '花旗參瘦肉湯',
++    description: '清補涼氣。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'pork',
++    flavors: ['bitter', 'light', 'umami'],
++    ingredients: ['花旗參 20g', '瘦肉 250g', '杞子少許'],
++    steps: ['瘦肉汆水', '燉或煲 1.5 小時'],
++  }),
++  r({
++    name: '芥菜番薯湯',
++    description: '簡單家鄉味。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'mid30',
++    mainIngredient: 'veg',
++    flavors: ['light', 'sweet'],
++    ingredients: ['芥菜 400g', '番薯 2 條', '薑片', '鹽'],
++    steps: ['番薯煲軟', '下芥菜煮 10 分鐘'],
++  }),
++  r({
++    name: '番茄薯仔湯',
++    description: '西式港式融合。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'mid30',
++    mainIngredient: 'mixed',
++    flavors: ['sour', 'umami', 'light'],
++    ingredients: ['番茄 4 個', '薯仔 3 個', '瘦肉 200g', '洋蔥半個'],
++    steps: ['炒番茄', '加水煲薯仔肉'],
++  }),
++  r({
++    name: '粟米鬚湯',
++    description: '利尿消腫。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'mixed',
++    flavors: ['sweet', 'light'],
++    ingredients: ['粟米 2 條', '粟米鬚 1 束', '瘦肉 200g', '胡萝卜'],
++    steps: ['材料煲 1.5 小時'],
++  }),
++  r({
++    name: '霸王花無花果湯',
++    description: '潤燥清熱。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'pork',
++    flavors: ['light', 'sweet'],
++    ingredients: ['霸王花 50g', '無花果 5 粒', '瘦肉 250g', '南北杏'],
++    steps: ['材料汆水煲 2 小時'],
++  }),
++  r({
++    name: '西洋菜陳腎湯',
++    description: '經典老火湯。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'pork',
++    flavors: ['bitter', 'light', 'umami'],
++    ingredients: ['西洋菜 500g', '陳腎 2 個', '豬骨 300g', '蜜棗'],
++    steps: ['骨腎汆水', '煲 1 小時後下西洋菜'],
++  }),
++  r({
++    name: '紅蘿蔔粟米湯',
++    description: '小朋友都飲得。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'pork',
++    flavors: ['sweet', 'umami'],
++    ingredients: ['紅蘿蔔 2 條', '粟米 2 條', '瘦肉 250g', '蜜棗'],
++    steps: ['材料煲 1.5 小時'],
++  }),
++  r({
++    name: '豆腐海帶湯',
++    description: '快手清湯。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'quick15',
++    mainIngredient: 'tofu',
++    flavors: ['umami', 'light'],
++    ingredients: ['豆腐 1 盒', '海帶 80g', '瘦肉絲 100g', '薑'],
++    steps: ['滾水落料', '煮 10 分鐘調味'],
++  }),
++  r({
++    name: '銀耳蓮子湯',
++    description: '糖水式潤肺湯。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'mixed',
++    flavors: ['sweet', 'light'],
++    ingredients: ['銀耳 1 朵', '蓮子 50g', '紅棗 6 粒', '冰糖'],
++    steps: ['銀耳浸發', '煲 1 小時', '加糖'],
++  }),
++  r({
++    name: '苦瓜黃豆湯',
++    description: '清熱解毒。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'mixed',
++    flavors: ['bitter', 'light'],
++    ingredients: ['苦瓜 1 條', '黃豆 100g', '排骨 300g'],
++    steps: ['豆浸', '排骨汆水', '煲 1.5 小時'],
++  }),
++  r({
++    name: '蘋果雪梨湯',
++    description: '滋潤甜湯。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'mixed',
++    flavors: ['sweet', 'light'],
++    ingredients: ['蘋果 2 個', '雪梨 2 個', '瘦肉 200g', '無花果'],
++    steps: ['材料切塊汆水', '煲 1.5 小時'],
++  }),
++  r({
++    name: '腐竹白果薏米湯',
++    description: '清潤甜品湯。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'long60',
++    mainIngredient: 'mixed',
++    flavors: ['sweet', 'light'],
++    ingredients: ['腐竹 2 片', '白果 50g', '薏米 60g', '冰糖'],
++    steps: ['薏米浸', '煲至軟糯', '加糖'],
++  }),
++
++  // —— 補充至 90+ ——
++  r({
++    name: '濕炒牛河',
++    description: '茶記濕滑版牛河。',
++    source: 'cha_chaan_teng',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'beef',
++    flavors: ['salty', 'umami'],
++    ingredients: ['河粉 400g', '牛肉 150g', '芽菜', '生抽、蠔油、芡汁'],
++    steps: ['牛肉炒半熟', '下河粉同芡汁快炒'],
++  }),
++  r({
++    name: '沙律雞卷配意粉',
++    description: '茶記西式午餐。',
++    source: 'cha_chaan_teng',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'chicken',
++    flavors: ['salty', 'umami', 'light'],
++    ingredients: ['雞卷 2 條', '意粉 200g', '沙律菜', '沙律醬'],
++    steps: ['雞卷煎熟', '意粉煮好', '拼盤'],
++  }),
++  r({
++    name: '餐肉蛋即食麵',
++    description: '最簡茶記風味。',
++    source: 'cha_chaan_teng',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami'],
++    ingredients: ['即食麵 2 個', '午餐肉 半罐', '蛋 2 隻'],
++    steps: ['麵煮熟', '餐肉蛋煎香', '拼盤'],
++  }),
++  r({
++    name: '魚蛋粉',
++    description: '便利店/粉麵店風味。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'fish',
++    flavors: ['umami', 'salty'],
++    ingredients: ['米粉 200g', '魚蛋 8–10 粒', '清湯 600ml', '胡椒粉'],
++    steps: ['滾湯下魚蛋', '粉煮熟入碗'],
++  }),
++  r({
++    name: '雲吞麵',
++    description: '港式經典麵食。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'pork',
++    flavors: ['umami', 'salty'],
++    ingredients: ['細麵 3 個', '鮮蝦雲吞 12 隻', '大地魚粉、麻油'],
++    steps: ['雲吞煮熟', '麵汆熟', '上湯調味'],
++    tips: '可買急凍雲吞。',
++  }),
++  r({
++    name: '牛腩麵',
++    description: '清湯或咖喱牛腩麵。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'long60',
++    mainIngredient: 'beef',
++    flavors: ['umami', 'salty'],
++    ingredients: ['牛腩 400g', '麵 3 個', '八角、薑、生抽'],
++    steps: ['牛腩燜 1 小時', '麵煮熟淋湯'],
++  }),
++  r({
++    name: '蝦餃燒賣點心餐',
++    description: '外賣點心配粥。',
++    source: 'chain',
++    meal: 'breakfast',
++    cookTime: 'quick15',
++    mainIngredient: 'seafood',
++    flavors: ['umami', 'light'],
++    ingredients: ['蝦餃、燒賣 各 6 件', '白粥 1 鍋（可選）'],
++    steps: ['點心蒸熱', '配粥或茶'],
++  }),
++  r({
++    name: '海南雞飯',
++    description: '連鎖海南雞店風味。',
++    source: 'chain',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'chicken',
++    flavors: ['umami', 'light'],
++    ingredients: ['雞脾 3 隻', '香米 2 杯', '薑蓉、辣椒醬'],
++    steps: ['雞浸熟', '雞油飯', '斬件配醬'],
++  }),
++  r({
++    name: '叉燒即食麵',
++    description: '茶記常見組合。',
++    source: 'cha_chaan_teng',
++    meal: 'lunch',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['sweet', 'salty', 'umami'],
++    ingredients: ['即食麵 2 個', '叉燒 150g', '菜心'],
++    steps: ['麵煮熟', '叉燒加熱', '拼盤'],
++  }),
++  r({
++    name: '芝士焗通粉',
++    description: '茶記西式。',
++    source: 'cha_chaan_teng',
++    meal: 'lunch',
++    cookTime: 'mid30',
++    mainIngredient: 'mixed',
++    flavors: ['salty', 'umami'],
++    ingredients: ['通粉 250g', '芝士、火腿', '白汁'],
++    steps: ['通粉煮軟', '拌白汁', '焗至金黃'],
++  }),
++  r({
++    name: '蒜香骨',
++    description: '連鎖中菜。',
++    source: 'chain',
++    meal: 'dinner',
++    cookTime: 'mid30',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami', 'spicy'],
++    ingredients: ['排骨 400g', '蒜蓉、辣椒', '生抽、糖'],
++    steps: ['排骨醃味炸熟', '炒蒜香'],
++  }),
++  r({
++    name: '清蒸水蛋（晚餐版）',
++    description: '配飯小菜。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'egg',
++    flavors: ['umami', 'light'],
++    ingredients: ['雞蛋 4 隻', '溫水', '蝦仁（可選）'],
++    steps: ['加蝦仁蒸蛋', '配飯'],
++  }),
++  r({
++    name: '欖菜肉鬆炒飯',
++    description: '鹹香下飯。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['salty', 'umami'],
++    ingredients: ['冷飯 3 碗', '欖菜 2 湯匙', '免治豬肉 100g'],
++    steps: ['炒肉鬆', '下欖菜同飯炒勻'],
++  }),
++  r({
++    name: '西蘭花炒牛肉',
++    description: '家常營養餐。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'beef',
++    flavors: ['umami', 'light'],
++    ingredients: ['牛肉 200g', '西蘭花 1 個', '蠔油'],
++    steps: ['牛肉醃好', '西蘭花汆水', '快炒'],
++  }),
++  r({
++    name: '鹹蛋芥菜湯',
++    description: '簡單滾湯。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'quick15',
++    mainIngredient: 'veg',
++    flavors: ['salty', 'light'],
++    ingredients: ['大芥菜 400g', '鹹蛋 2 隻', '薑', '肉片 100g'],
++    steps: ['滾水下料', '煮 12 分鐘'],
++  }),
++  r({
++    name: '青瓜炒肉',
++    description: '夏日清爽小炒。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'quick15',
++    mainIngredient: 'pork',
++    flavors: ['light', 'umami'],
++    ingredients: ['青瓜 2 條', '豬肉片 150g', '蒜蓉'],
++    steps: ['肉片醃好', '快炒青瓜肉'],
++  }),
++  r({
++    name: '豆腐魚頭湯',
++    description: '鮮甜滾湯。',
++    source: 'home',
++    meal: 'soup',
++    cookTime: 'mid30',
++    mainIngredient: 'fish',
++    flavors: ['umami', 'light'],
++    ingredients: ['魚頭 1 個', '豆腐 1 盒', '薑片', '芫荽'],
++    steps: ['煎魚頭', '加滾水煮白', '下豆腐'],
++  }),
++  r({
++    name: '三餸一湯套餐（簡版）',
++    description: '一個晚餐組合靈感：蒸魚、炒菜、肉餅、老火湯。',
++    source: 'home',
++    meal: 'dinner',
++    cookTime: 'long60',
++    mainIngredient: 'mixed',
++    flavors: ['umami', 'light'],
++    ingredients: ['魚 1 條', '時蔬 1 款', '肉餅 1 碟', '老火湯 1 煲'],
++    steps: ['湯先煲', '蒸魚同蒸肉餅', '最後炒菜'],
++    tips: '1–3 人可縮細份量，每樣做細份。',
++  }),
++].map((item, i) => ({ ...item, id: item.id ?? `recipe-${i + 1}` }))
++
++export const recipes = recipeSeeds
+diff --git a/src/index.css b/src/index.css
+index 2f487b6..75dbc9d 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -75,6 +75,36 @@ p {
+   pointer-events: none;
+ }
+ 
++.section-tabs {
++  position: relative;
++  z-index: 6;
++  display: grid;
++  grid-template-columns: 1fr 1fr;
++  gap: 0.4rem;
++  margin-top: 0.75rem;
++  padding: 0.35rem;
++  border-radius: 14px;
++  background: rgba(255, 255, 255, 0.65);
++  border: 1px solid var(--line);
++  backdrop-filter: blur(10px);
++}
++
++.section-tab {
++  border: none;
++  border-radius: 10px;
++  padding: 0.75rem 0.5rem;
++  background: transparent;
++  color: var(--ink-soft);
++  font-weight: 700;
++  font-size: 0.95rem;
++  transition: background 0.2s ease, color 0.2s ease;
++}
++
++.section-tab.is-on {
++  background: var(--jade-deep);
++  color: white;
++}
++
+ .view-tabs {
+   position: relative;
+   z-index: 5;
+@@ -121,6 +151,50 @@ p {
+     radial-gradient(closest-side, rgba(229, 106, 61, 0.22), transparent 72%);
+ }
+ 
++.hero-cook .hero-glow {
++  background:
++    radial-gradient(closest-side, rgba(229, 106, 61, 0.35), transparent 70%),
++    radial-gradient(closest-side, rgba(216, 196, 160, 0.35), transparent 72%);
++}
++
++.hero-cook .brand {
++  letter-spacing: 0.06em;
++}
++
++.tag-flavor {
++  background: rgba(229, 106, 61, 0.14);
++  color: var(--sunset-deep);
++}
++
++.sheet-subhead {
++  font-family: var(--font-display);
++  font-size: 1.1rem;
++  margin: 1rem 0 0.5rem;
++  color: var(--jade-deep);
++}
++
++.recipe-list,
++.recipe-steps {
++  margin: 0 0 0.75rem;
++  padding-left: 1.2rem;
++  color: var(--ink-soft);
++  line-height: 1.6;
++  font-size: 0.92rem;
++}
++
++.recipe-steps {
++  display: grid;
++  gap: 0.35rem;
++}
++
++.sheet-flavors {
++  margin-bottom: 0.25rem;
++}
++
++.sheet-recipe {
++  max-height: min(90svh, 780px);
++}
++
+ .status-pill {
+   pointer-events: auto;
+   border: 1px solid var(--line);
+diff --git a/src/lib/recipeRecommend.ts b/src/lib/recipeRecommend.ts
+new file mode 100644
+index 0000000..5fa7e05
+--- /dev/null
++++ b/src/lib/recipeRecommend.ts
+@@ -0,0 +1,53 @@
++import { recipes } from '../data/recipes'
++import type { RecipeFilters, ScoredRecipe } from '../types'
++
++export function recommendRecipes(
++  filters: RecipeFilters,
++  limit?: number,
++): ScoredRecipe[] {
++  const scored: ScoredRecipe[] = []
++
++  for (const recipe of recipes) {
++    if (filters.meal !== 'any' && recipe.meal !== filters.meal) continue
++    if (filters.cookTime !== 'any' && recipe.cookTime !== filters.cookTime) continue
++    if (
++      filters.mainIngredient !== 'any' &&
++      recipe.mainIngredient !== filters.mainIngredient
++    ) {
++      continue
++    }
++    if (filters.source !== 'any' && recipe.source !== filters.source) continue
++    if (
++      filters.flavors.length > 0 &&
++      !filters.flavors.some((f) => recipe.flavors.includes(f))
++    ) {
++      continue
++    }
++
++    let score = 10
++    if (filters.flavors.length > 0) score += 8
++    if (filters.meal !== 'any') score += 4
++    if (filters.cookTime !== 'any') score += 3
++
++    scored.push({ recipe, score })
++  }
++
++  scored.sort(
++    (a, b) =>
++      b.score - a.score || a.recipe.name.localeCompare(b.recipe.name, 'zh-HK'),
++  )
++
++  const cap = limit ?? Number.POSITIVE_INFINITY
++  return Number.isFinite(cap) ? scored.slice(0, cap) : scored
++}
++
++export function pickRandomRecipe(filters: RecipeFilters): ScoredRecipe | null {
++  const list = recommendRecipes(filters, 24)
++  if (list.length === 0) return null
++  const top = list.slice(0, Math.min(10, list.length))
++  return top[Math.floor(Math.random() * top.length)] ?? null
++}
++
++export function recipeCatalogSize(): number {
++  return recipes.length
++}
+diff --git a/src/types.ts b/src/types.ts
+index 68f0cda..d9c3014 100644
+--- a/src/types.ts
++++ b/src/types.ts
+@@ -75,3 +75,55 @@ export type ActivityDraft = Omit<Activity, 'id' | 'custom' | 'districts' | 'plac
+   districts: HkDistrict[]
+   placeLabel?: string
+ }
++
++// —— 今日煮咩好 ——
++
++export type AppSection = 'activities' | 'recipes'
++
++export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'soup'
++
++export type CookTime = 'quick15' | 'mid30' | 'long60'
++
++export type IngredientMain =
++  | 'chicken'
++  | 'pork'
++  | 'beef'
++  | 'fish'
++  | 'seafood'
++  | 'veg'
++  | 'egg'
++  | 'tofu'
++  | 'mixed'
++
++/** 主味標籤 */
++export type FlavorTag = 'sweet' | 'salty' | 'umami' | 'spicy' | 'sour' | 'bitter' | 'light'
++
++export type RecipeSource = 'chain' | 'cha_chaan_teng' | 'home'
++
++export interface Recipe {
++  id: string
++  name: string
++  description: string
++  source: RecipeSource
++  meal: MealType
++  cookTime: CookTime
++  mainIngredient: IngredientMain
++  flavors: FlavorTag[]
++  /** 材料行，預設 1–3 人份量 */
++  ingredients: string[]
++  steps: string[]
++  tips?: string
++}
++
++export interface RecipeFilters {
++  meal: MealType | 'any'
++  cookTime: CookTime | 'any'
++  mainIngredient: IngredientMain | 'any'
++  flavors: FlavorTag[]
++  source: RecipeSource | 'any'
++}
++
++export interface ScoredRecipe {
++  recipe: Recipe
++  score: number
++}
+-- 
+2.43.0
+

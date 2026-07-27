@@ -75,3 +75,55 @@ export type ActivityDraft = Omit<Activity, 'id' | 'custom' | 'districts' | 'plac
   districts: HkDistrict[]
   placeLabel?: string
 }
+
+// —— 今日煮咩好 ——
+
+export type AppSection = 'activities' | 'recipes'
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'soup'
+
+export type CookTime = 'quick15' | 'mid30' | 'long60'
+
+export type IngredientMain =
+  | 'chicken'
+  | 'pork'
+  | 'beef'
+  | 'fish'
+  | 'seafood'
+  | 'veg'
+  | 'egg'
+  | 'tofu'
+  | 'mixed'
+
+/** 主味標籤 */
+export type FlavorTag = 'sweet' | 'salty' | 'umami' | 'spicy' | 'sour' | 'bitter' | 'light'
+
+export type RecipeSource = 'chain' | 'cha_chaan_teng' | 'home'
+
+export interface Recipe {
+  id: string
+  name: string
+  description: string
+  source: RecipeSource
+  meal: MealType
+  cookTime: CookTime
+  mainIngredient: IngredientMain
+  flavors: FlavorTag[]
+  /** 材料行，預設 1–3 人份量 */
+  ingredients: string[]
+  steps: string[]
+  tips?: string
+}
+
+export interface RecipeFilters {
+  meal: MealType | 'any'
+  cookTime: CookTime | 'any'
+  mainIngredient: IngredientMain | 'any'
+  flavors: FlavorTag[]
+  source: RecipeSource | 'any'
+}
+
+export interface ScoredRecipe {
+  recipe: Recipe
+  score: number
+}
